@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lamplight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Courier+Prime:wght@400;700&display=swap">
+<style>
+  /* Layout: one full-bleed night-sea canvas; a thin ship's-log HUD on top; paper card overlays for title and wreck report. */
+  :root {
+    --night: #0b1420;      /* sea at night */
+    --swell: #16263a;      /* wave highlight */
+    --lamp: #f2c36b;       /* lantern amber */
+    --paper: #e9dfc7;      /* log-book paper */
+    --ink: #2a2118;        /* log-book ink */
+    --rust: #c4553b;       /* wreck / danger */
+    --display: "IM Fell English SC", "IM Fell English", Georgia, serif;
+    --body: "IM Fell English", Georgia, "Times New Roman", serif;
+    --mono: "Courier Prime", "Courier New", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--night); color: var(--paper); font-family: var(--body); overflow: hidden; }
+  #wrap { position: relative; height: 100%; width: 100%; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+  .hud {
+    position: absolute; inset: 0 0 auto 0; display: flex; flex-wrap: wrap; gap: 4px 20px;
+    justify-content: space-between; align-items: baseline;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+    font-family: var(--mono); font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+    font-variant-numeric: tabular-nums; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(11,20,32,.85), rgba(11,20,32,0));
+  }
+  .hud b { color: var(--lamp); font-weight: 700; }
+  .hud .lives { color: var(--lamp); letter-spacing: .3em; }
+  .hud .lives .out { color: #3a4656; }
+
+  .log {
+    position: absolute; left: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    font-family: var(--mono); font-size: 12px; line-height: 1.5; color: rgba(233,223,199,.75);
+    pointer-events: none; max-width: min(60ch, calc(100% - 140px));
+  }
+  .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .log .bad { color: var(--rust); }
+  .log .good { color: var(--lamp); }
+
+  .card {
+    position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+    background: rgba(5,10,16,.55);
+  }
+  .sheet {
+    background: var(--paper); color: var(--ink); max-width: 30rem; width: 100%;
+    padding: 28px 28px 24px; border-radius: 2px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 0 40px rgba(120,90,40,.18);
+    display: grid; gap: 14px;
+  }
+  .sheet h1 { font-family: var(--display); font-weight: 400; font-size: clamp(2.4rem, 8vw, 3.4rem); line-height: 1; margin: 0; text-wrap: balance; }
+  .sheet h2 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.05; margin: 0; }
+  .sheet p { margin: 0; font-size: 1.08rem; line-height: 1.45; }
+  .sheet .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+  .sheet dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0; font-family: var(--mono); font-size: 13px; }
+  .sheet dt { text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
+  .sheet dd { margin: 0; }
+  .sheet .stats { font-variant-numeric: tabular-nums; }
+  .sheet button {
+    justify-self: start; font-family: var(--display); font-size: 1.3rem; padding: 8px 22px;
+    background: var(--ink); color: var(--lamp); border: 0; border-radius: 2px; cursor: pointer;
+  }
+  .sheet button:hover { background: #3d3022; }
+  button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
+
+  #focusBtn {
+    position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 84px; height: 84px; border-radius: 50%; border: 2px solid var(--lamp);
+    background: rgba(242,195,107,.12); color: var(--lamp); font-family: var(--mono);
+    font-size: 12px; letter-spacing: .1em; text-transform: uppercase; touch-action: none;
+  }
+  #focusBtn.on { background: rgba(242,195,107,.45); color: var(--ink); }
+  #muteBtn {
+    position: absolute; right: 16px; top: calc(44px + env(safe-area-inset-top, 0px));
+    background: none; border: 1px solid rgba(233,223,199,.3); color: var(--paper);
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 2px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" aria-label="Lamplight game: a lighthouse beam sweeping a dark sea"></canvas>
+
+  <div class="hud" aria-live="polite">
+    <span>Ships home <b id="score">0</b></span>
+    <span>Best <b id="best">0</b></span>
+    <span>Watch <b id="clock">20:00</b></span>
+    <span class="lives" id="lives" aria-label="Lamps remaining">◆◆◆</span>
+  </div>
+  <div class="log" id="log"></div>
+  <button id="muteBtn" type="button">Sound on</button>
+  <button id="focusBtn" type="button" hidden>Focus</button>
+
+  <div class="card" id="intro">
+    <div class="sheet">
+      <span class="eyebrow">Keeper's log · Gull Rock Light</span>
+      <h1>Lamplight</h1>
+      <p>Ships are sailing blind toward the shoals. Sweep your beam across the fog. Hold a ship in the light until its crew sights you, and it will turn for harbour.</p>
+      <dl>
+        <dt>Aim</dt><dd>Move the mouse, drag, or ← →</dd>
+        <dt>Focus</dt><dd>Hold click, Space, or the Focus button. A narrow beam signals much faster.</dd>
+        <dt>Lose</dt><dd>Three wrecks on the rocks ends the watch.</dd>
+      </dl>
+      <button id="startBtn" type="button">Light the lamp</button>
+    </div>
+  </div>
+
+  <div class="card" id="over" hidden>
+    <div class="sheet">
+      <span class="eyebrow">Keeper's log · end of watch</span>
+      <h2 id="overTitle">The lamp goes dark</h2>
+      <dl class="stats">
+        <dt>Ships home</dt><dd id="oScore">0</dd>
+        <dt>Close calls</dt><dd id="oClose">0</dd>
+        <dt>Watch kept</dt><dd id="oTime">20:00 – 20:00</dd>
+        <dt>Best</dt><dd id="oBest">0</dd>
+      </dl>
+      <button id="againBtn" type="button">Keep another watch</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const NAMES = ['Kittiwake','Mary Ellen','Lark','Good Intent','Plover','Brave Annie','Saltash','Morwenna',
+    'Sea Pink','Fulmar','Hope & Glory','Curlew','Petrel','Jenny Wren','Polperro','Thrift','Guillemot',
+    'Stormy Petrel','Two Brothers','Gannet','Lady Grey','Shearwater','Pilchard','Boy Daniel'];
+
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildRocks();
+  }
+
+  // Geometry derived from the screen each frame.
+  const lh = () => ({ x: W / 2, y: H - 70 });
+  const shoalY = () => H - 135;
+
+  // ---------- state ----------
+  let best = 0;
+  try { best = +localStorage.getItem('lamplight-best') || 0; } catch (e) {}
+  $('best').textContent = best;
+
+  let S = null;
+  function newGame() {
+    S = {
+      running: true, t: 0, score: 0, close: 0, lives: 3,
+      beam: -Math.PI / 2, aimTarget: null, focus: false,
+      ships: [], spawnIn: 1.2, shake: 0, flashes: [], usedNames: [],
+    };
+    logLines.length = 0; renderLog();
+    addLog('Lamp lit. Fog coming in from the south-west.', '');
+    updateHud();
+  }
+
+  // ---------- input ----------
+  const keys = {};
+  addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Space') e.preventDefault();
+    keys[e.code] = true;
+    if (e.code === 'KeyM') toggleMute();
+    if (e.code === 'Enter' && (!S || !S.running)) begin();
+  });
+  addEventListener('keyup', e => { keys[e.code] = false; });
+
+  function aimAt(clientX, clientY) {
+    if (!S) return;
+    const r = cv.getBoundingClientRect();
+    const p = lh();
+    const a = Math.atan2(clientY - r.top - p.y, clientX - r.left - p.x);
+    S.aimTarget = clampBeam(a > Math.PI / 2 ? -Math.PI : a > 0 ? 0 : a);
+  }
+  let mouseFocus = false, btnFocus = false;
+  cv.addEventListener('pointermove', e => aimAt(e.clientX, e.clientY));
+  cv.addEventListener('pointerdown', e => {
+    aimAt(e.clientX, e.clientY);
+    if (e.pointerType === 'mouse') mouseFocus = true;
+    initAudio();
+  });
+  addEventListener('pointerup', e => { if (e.pointerType === 'mouse') mouseFocus = false; });
+
+  const fb = $('focusBtn');
+  if (matchMedia('(pointer: coarse)').matches) fb.hidden = false;
+  fb.addEventListener('pointerdown', e => { e.preventDefault(); btnFocus = true; fb.classList.add('on'); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+    fb.addEventListener(ev, () => { btnFocus = false; fb.classList.remove('on'); }));
+
+  const clampBeam = a => Math.max(-Math.PI + 0.12, Math.min(-0.12, a));
+
+  // ---------- audio ----------
+  let AC = null, muted = false;
+  function initAudio() {
+    if (AC) return;
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  function toggleMute() { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; }
+  $('muteBtn').addEventListener('click', () => { initAudio(); toggleMute(); });
+  function tone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
+    if (!AC || muted) return;
+    const t0 = AC.currentTime;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(AC.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  const sndBell = () => { tone(880, 1.2, 'sine', 0.12); tone(1320, 0.9, 'sine', 0.05); };
+  const sndHorn = () => { tone(98, 1.4, 'sawtooth', 0.08, 0.92); tone(65, 1.4, 'sine', 0.15); };
+  const sndSight = () => tone(660, 0.25, 'triangle', 0.06);
+
+  // ---------- log ----------
+  const logLines = [];
+  function addLog(text, cls) {
+    logLines.push({ text: `${clockStr()}  ${text}`, cls });
+    if (logLines.length > 4) logLines.shift();
+    renderLog();
+  }
+  function renderLog() {
+    $('log').innerHTML = '';
+    for (const l of logLines) {
+      const d = document.createElement('div');
+      d.textContent = l.text; if (l.cls) d.className = l.cls;
+      $('log').appendChild(d);
+    }
+  }
+  // One game second = one watch minute, starting at 20:00.
+  function clockStr(t = S ? S.t : 0) {
+    const m = 20 * 60 + Math.floor(t);
+    return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  }
+  const bearing = a => String(Math.round(((a * 180 / Math.PI) + 90 + 360) % 360)).padStart(3, '0') + '°';
+
+  function updateHud() {
+    $('score').textContent = S.score;
+    $('best').textContent = Math.max(best, S.score);
+    $('clock').textContent = clockStr();
+    $('lives').innerHTML = [0, 1, 2].map(i => i < S.lives ? '◆' : '<span class="out">◇</span>').join('');
+  }
+
+  // ---------- ships ----------
+  function pickName() {
+    const free = NAMES.filter(n => !S.usedNames.includes(n));
+    const n = free[Math.floor(Math.random() * free.length)] || NAMES[0];
+    S.usedNames.push(n); if (S.usedNames.length > 12) S.usedNames.shift();
+    return n;
+  }
+  function spawnShip() {
+    const diff = Math.min(1, S.t / 180);
+    const x = W * (0.08 + Math.random() * 0.84);
+    const tx = W * (0.2 + Math.random() * 0.6);
+    const speed = (H / 26) * (1 + diff * 1.3) * (0.8 + Math.random() * 0.4);
+    const ang = Math.atan2(shoalY() - 0, tx - x);
+    S.ships.push({
+      x, y: -20, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, speed,
+      seen: 0, state: 'dark', name: pickName(), size: 0.85 + Math.random() * 0.4,
+      bob: Math.random() * 6, sink: 0, lit: false,
+    });
+  }
+
+  function inBeam(s, half) {
+    const p = lh();
+    const dx = s.x - p.x, dy = s.y - p.y;
+    if (Math.hypot(dx, dy) > Math.max(W, H) * 1.2) return false;
+    let d = Math.atan2(dy, dx) - S.beam;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    return Math.abs(d) < half;
+  }
+
+  // ---------- update ----------
+  function update(dt) {
+    S.t += dt;
+    S.focus = mouseFocus || btnFocus || keys.Space;
+    const half = S.focus ? 0.075 : 0.2;
+    const turn = S.focus ? 1.3 : 2.4;
+
+    if (keys.ArrowLeft) S.aimTarget = clampBeam((S.aimTarget ?? S.beam) - turn * dt);
+    if (keys.ArrowRight) S.aimTarget = clampBeam((S.aimTarget ?? S.beam) + turn * dt);
+    if (S.aimTarget != null) {
+      const d = S.aimTarget - S.beam;
+      const step = turn * dt;
+      S.beam += Math.abs(d) < step ? d : Math.sign(d) * step;
+    }
+
+    // Spawning: gaps shrink across the first three hours of watch.
+    S.spawnIn -= dt;
+    if (S.spawnIn <= 0) {
+      spawnShip();
+      const diff = Math.min(1, S.t / 180);
+      S.spawnIn = (3.4 - diff * 2.1) * (0.7 + Math.random() * 0.6);
+      if (diff > 0.5 && Math.random() < diff * 0.35) spawnShip();
+    }
+
+    const rate = S.focus ? 1.9 : 0.55;
+    for (const s of S.ships) {
+      s.bob += dt;
+      if (s.state === 'dark') {
+        s.lit = inBeam(s, half);
+        if (s.lit) s.seen += rate * dt; else s.seen = Math.max(0, s.seen - 0.12 * dt);
+        if (s.seen >= 1) {
+          s.state = 'safe';
+          s.dir = s.x < W / 2 ? -1 : 1;
+          const closeCall = s.y > shoalY() - H * 0.18;
+          s.close = closeCall;
+          sndSight();
+          addLog(`${s.name} sighted the light, bearing ${bearing(Math.atan2(s.y - lh().y, s.x - lh().x))}${closeCall ? ' (close call)' : ''}`, 'good');
+        }
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        if (s.y >= shoalY()) {
+          s.state = 'wreck'; S.lives--; S.shake = reduceMotion ? 0 : 0.5;
+          S.flashes.push({ x: s.x, y: s.y, t: 0 });
+          sndHorn();
+          addLog(`${s.name} struck Gull Rock.`, 'bad');
+          if (S.lives <= 0) endGame();
+        }
+      } else if (s.state === 'safe') {
+        s.lit = inBeam(s, half);
+        const tvx = s.dir * s.speed * 1.5, tvy = -s.speed * 0.15;
+        s.vx += (tvx - s.vx) * Math.min(1, dt * 1.6);
+        s.vy += (tvy - s.vy) * Math.min(1, dt * 1.6);
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        if (s.x < -40 || s.x > W + 40) {
+          s.state = 'gone'; S.score += s.close ? 2 : 1; if (s.close) S.close++;
+          sndBell();
+        }
+      } else if (s.state === 'wreck') {
+        s.sink += dt;
+        if (s.sink > 3) s.state = 'gone';
+      }
+    }
+    S.ships = S.ships.filter(s => s.state !== 'gone');
+    S.flashes = S.flashes.filter(f => (f.t += dt) < 1.2);
+    S.shake = Math.max(0, S.shake - dt);
+    updateHud();
+  }
+
+  // ---------- drawing ----------
+  let rocks = [];
+  function buildRocks() {
+    rocks = [];
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const y0 = H - 135;
+    for (let x = -20; x < W + 40; x += 18 + rnd() * 26) {
+      const h = 10 + rnd() * 22;
+      rocks.push({ x, y: y0 + 6 + rnd() * 14, w: 22 + rnd() * 30, h });
+    }
+  }
+
+  const fog = Array.from({ length: 14 }, () => ({
+    x: Math.random(), y: Math.random() * 0.7, r: 0.12 + Math.random() * 0.2, v: 0.004 + Math.random() * 0.01,
+  }));
+
+  function drawSea(t) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#060c14'); g.addColorStop(0.7, '#0b1420'); g.addColorStop(1, '#0f1c2b');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(60,90,120,0.18)'; ctx.lineWidth = 1;
+    for (let y = 30; y < H - 100; y += 22) {
+      ctx.beginPath();
+      const off = reduceMotion ? 0 : t * (8 + y * 0.02);
+      for (let x = -20; x < W + 20; x += 14) {
+        const yy = y + Math.sin((x + off) * 0.035 + y) * 2;
+        x === -20 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawFog(t) {
+    for (const f of fog) {
+      if (!reduceMotion) f.x += f.v * 0.016;
+      if (f.x - f.r > 1.1) f.x = -f.r;
+      const x = f.x * W, y = f.y * H, r = f.r * Math.max(W, H);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(120,140,160,0.10)'); g.addColorStop(1, 'rgba(120,140,160,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawBeam(focus) {
+    const p = lh(); const half = focus ? 0.075 : 0.2;
+    const R = Math.max(W, H) * 1.3;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(p.x, p.y - 40, 10, p.x, p.y - 40, R);
+    const a = focus ? 0.42 : 0.24;
+    g.addColorStop(0, `rgba(242,195,107,${a})`); g.addColorStop(0.5, `rgba(242,195,107,${a * 0.35})`);
+    g.addColorStop(1, 'rgba(242,195,107,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y - 40);
+    ctx.arc(p.x, p.y - 40, R, S.beam - half, S.beam + half); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawShip(s, t) {
+    const sink = s.state === 'wreck' ? s.sink : 0;
+    const k = s.size;
+    const heading = Math.atan2(s.vy, s.vx);
+    ctx.save();
+    ctx.translate(s.x, s.y + Math.sin(s.bob * 2) * 1.2 + sink * 6);
+    const visible = s.lit || s.state === 'safe';
+    ctx.globalAlpha = s.state === 'wreck' ? Math.max(0, 1 - sink / 3) : 1;
+
+    if (visible || s.state === 'wreck') {
+      // Hull seen from above, pointing along heading.
+      ctx.save(); ctx.rotate(heading + (s.state === 'wreck' ? sink * 0.4 : 0));
+      ctx.fillStyle = s.state === 'wreck' ? '#4a2a22' : '#3a2c22';
+      ctx.beginPath();
+      ctx.moveTo(16 * k, 0); ctx.quadraticCurveTo(4 * k, -7 * k, -12 * k, -6 * k);
+      ctx.lineTo(-12 * k, 6 * k); ctx.quadraticCurveTo(4 * k, 7 * k, 16 * k, 0); ctx.fill();
+      ctx.fillStyle = '#e9dfc7';
+      ctx.beginPath(); ctx.moveTo(6 * k, 0); ctx.lineTo(-6 * k, -10 * k); ctx.lineTo(-4 * k, 0); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // Running light: always visible, the only clue in the dark.
+    if (s.state !== 'wreck') {
+      ctx.fillStyle = s.state === 'safe' ? '#9be29b' : '#e86a50';
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(0, -2, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    // Signal progress ring.
+    if (s.state === 'dark' && s.seen > 0) {
+      ctx.strokeStyle = 'rgba(242,195,107,0.9)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 20 * k, -Math.PI / 2, -Math.PI / 2 + s.seen * Math.PI * 2); ctx.stroke();
+    }
+    if (visible && s.state !== 'wreck') {
+      ctx.fillStyle = 'rgba(233,223,199,0.85)';
+      ctx.font = '11px "Courier Prime", monospace'; ctx.textAlign = 'center';
+      ctx.fillText(s.name, 0, 30 * k);
+    }
+    ctx.restore();
+  }
+
+  function drawShore(t) {
+    const y0 = shoalY();
+    // Danger line as faint surf.
+    ctx.strokeStyle = 'rgba(233,223,199,0.18)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke(); ctx.setLineDash([]);
+    for (const r of rocks) {
+      ctx.fillStyle = '#05080c';
+      ctx.beginPath();
+      ctx.moveTo(r.x - r.w / 2, r.y + 8); ctx.lineTo(r.x - r.w / 4, r.y - r.h * 0.6);
+      ctx.lineTo(r.x + r.w / 8, r.y - r.h); ctx.lineTo(r.x + r.w / 2, r.y + 8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(233,223,199,0.25)';
+      ctx.beginPath(); ctx.moveTo(r.x - r.w / 2, r.y + 8 + Math.sin(t * 2 + r.x) * 1.5);
+      ctx.lineTo(r.x + r.w / 2, r.y + 8 + Math.sin(t * 2 + r.x) * 1.5); ctx.stroke();
+    }
+    // Headland
+    ctx.fillStyle = '#04070b';
+    ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, H - 40);
+    ctx.quadraticCurveTo(W * 0.3, H - 50, W / 2 - 60, H - 70);
+    ctx.lineTo(W / 2 + 60, H - 70); ctx.quadraticCurveTo(W * 0.7, H - 50, W, H - 40);
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  }
+
+  function drawLighthouse(focus) {
+    const p = lh();
+    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.fillStyle = '#d8ccb0';
+    ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-9, -34); ctx.lineTo(9, -34); ctx.lineTo(14, 0); ctx.fill();
+    ctx.fillStyle = '#c4553b';
+    ctx.fillRect(-12.5, -12, 25, 6); ctx.fillRect(-10.5, -26, 21, 6);
+    ctx.fillStyle = '#2a2118'; ctx.fillRect(-11, -36, 22, 3);
+    const g = ctx.createRadialGradient(0, -41, 0, 0, -41, focus ? 26 : 18);
+    g.addColorStop(0, 'rgba(255,230,160,1)'); g.addColorStop(1, 'rgba(242,195,107,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -41, focus ? 26 : 18, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a2118';
+    ctx.beginPath(); ctx.moveTo(-8, -46); ctx.lineTo(0, -54); ctx.lineTo(8, -46); ctx.fill();
+    ctx.restore();
+  }
+
+  function render(t) {
+    ctx.save();
+    if (S && S.shake > 0) ctx.translate((Math.random() - 0.5) * 10 * S.shake, (Math.random() - 0.5) * 10 * S.shake);
+    drawSea(t);
+    if (S) drawBeam(S.focus);
+    drawFog(t);
+    if (S) for (const s of S.ships) drawShip(s, t);
+    drawShore(t);
+    if (S) for (const f of S.flashes) {
+      ctx.strokeStyle = `rgba(196,85,59,${1 - f.t / 1.2})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 10 + f.t * 50, 0, Math.PI * 2); ctx.stroke();
+    }
+    drawLighthouse(S && S.focus);
+    ctx.restore();
+  }
+
+  // ---------- flow ----------
+  function endGame() {
+    S.running = false;
+    if (S.score > best) { best = S.score; try { localStorage.setItem('lamplight-best', best); } catch (e) {} }
+    $('overTitle').textContent = S.score >= best && S.score > 0 ? 'A record watch' : 'The lamp goes dark';
+    $('oScore').textContent = S.score;
+    $('oClose').textContent = S.close;
+    $('oTime').textContent = `20:00 – ${clockStr()}`;
+    $('oBest').textContent = best;
+    $('over').hidden = false;
+    $('againBtn').focus();
+  }
+  function begin() {
+    initAudio();
+    $('intro').hidden = true; $('over').hidden = true;
+    newGame();
+  }
+  $('startBtn').addEventListener('click', begin);
+  $('againBtn').addEventListener('click', begin);
+
+  let paused = false;
+  document.addEventListener('visibilitychange', () => { paused = document.hidden; });
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S && S.running && !paused) update(dt);
+    render(now / 1000);
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
