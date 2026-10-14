@@ -12,3 +12,7 @@ Open `index.html` in a browser. It needs no build step and no install.
 - A ship saved close to the rocks counts double.
 - Three wrecks end the watch.
 - **M** toggles sound.
+
+## Also in this repository
+
+- [Theater of War](theater-of-war/): an AI war simulation where you command a war in plain words. See its own README.

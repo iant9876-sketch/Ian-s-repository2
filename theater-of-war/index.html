@@ -1,0 +1,2026 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Theater of War</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: operations room. Situation map + faction board left, dispatch log and order line center, the Wire (in-world feed) right. Single dark look on purpose. */
+:root{
+  color-scheme: dark;
+  --ground:#0d1315; --panel:#141c1f; --panel-2:#1a2427; --line:#273539; --line-2:#36474c;
+  --ink:#dfe1d6; --dim:#8b9791; --faint:#5d6a66;
+  --brass:#d6a447; --brass-ink:#1b1408;
+  --friendly:#4f8fd6; --hostile:#d0503c; --neutral:#7aa363; --unknown:#d8c24a;
+  --sea:#0a1418;
+  --t-map:#4a9cc0; --t-cmd:#d6a447; --t-fac:#7aa363; --t-wire:#cdb68c; --t-chars:#9a8fd6;
+  --f-display:"Saira Condensed","Arial Narrow",Impact,sans-serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-prose:"Source Serif 4",Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font:14px/1.5 var(--f-ui);}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.mono{font-family:var(--f-mono)}
+.label{font:500 11px/1.2 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.02em;text-wrap:balance;margin:0}
+
+/* ---------- buttons ---------- */
+.btn{border:1px solid var(--line-2);background:var(--panel-2);border-radius:4px;padding:7px 12px;font:500 13px/1.2 var(--f-ui);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--dim)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:var(--brass-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn.danger{border-color:#6b3229;color:#f0a597;background:transparent}
+
+/* ---------- setup screen ---------- */
+#setup{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:28px 48px;display:flex;flex-direction:column;gap:28px}
+.brand{display:flex;flex-direction:column;gap:8px}
+.brand h1{font-size:clamp(40px,7vw,68px);line-height:.95;text-transform:uppercase;letter-spacing:.03em}
+.brand h1 span{color:var(--brass)}
+.brand p{margin:0;color:var(--dim);max-width:60ch;font-size:15px}
+.notice{border:1px solid #6b5a2a;background:#1f1a0e;color:#ecd7a0;border-radius:4px;padding:10px 14px;font-size:13px}
+.saves{display:flex;flex-direction:column;gap:10px}
+.save-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.save-item{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:10px 12px}
+.save-item .meta{min-width:0}
+.save-item .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.save-item .s{font:12px var(--f-mono);color:var(--dim)}
+.save-item .acts{display:flex;gap:6px;flex-shrink:0}
+.scen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.scen{position:relative;display:flex;flex-direction:column;gap:10px;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:16px;overflow:hidden}
+.scen:hover{border-color:var(--line-2)}
+.scen canvas{width:100%;height:120px;border-radius:3px;display:block;background:var(--sea)}
+.scen h3{font-size:24px;line-height:1.05}
+.scen .era{font:12px var(--f-mono);color:var(--brass)}
+.scen p{margin:0;color:var(--dim);font-size:13px;flex:1}
+.scen .you{font-size:12px;color:var(--ink)}
+.scen .you b{color:var(--friendly);font-weight:600}
+.custom{border:1px dashed var(--line-2);background:transparent}
+.field{display:flex;flex-direction:column;gap:5px}
+.field textarea,.field input{width:100%;background:var(--ground);border:1px solid var(--line-2);border-radius:4px;padding:8px 10px;font-size:13px;resize:vertical}
+.gen-status{font:12px var(--f-mono);color:var(--brass);min-height:1em}
+
+/* ---------- game screen ---------- */
+#game{display:flex;flex-direction:column;min-height:100%}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-inline:16px;padding-block:10px;background:color-mix(in srgb,var(--ground) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+@media (max-width:700px){.topbar{position:static}}
+.topbar .title{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
+.topbar .title h2{font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
+.topbar .title .sub{font:12px var(--f-mono);color:var(--brass)}
+.ledger{display:flex;gap:16px;font:12px var(--f-mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.ledger b{display:block;color:var(--ink);font-weight:500;font-size:14px}
+.topbar .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.savestate{font:11px var(--f-mono);color:var(--faint);min-width:9ch}
+
+.panel{--tint:var(--line-2);border:1px solid var(--line);border-top:2px solid color-mix(in srgb,var(--tint) 55%,var(--line));background:color-mix(in srgb,var(--tint) 4%,var(--panel));border-radius:4px;min-width:0;display:flex;flex-direction:column}
+.panel>header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--tint) 9%,transparent)}
+.panel>header .label:first-child{color:color-mix(in srgb,var(--tint) 55%,var(--ink))}
+.mapwrap{--tint:var(--t-map);align-self:start} .cmd{--tint:var(--t-cmd)} .fac{--tint:var(--t-fac)} .wire{--tint:var(--t-wire)} .chars{--tint:var(--t-chars)}
+.ticker{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--t-wire) 7%,var(--ground));font-size:13px;overflow:hidden}
+.tk-label{flex-shrink:0;display:flex;align-items:center;padding-inline:12px 10px;font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ground);background:var(--t-wire)}
+.tk-win{flex:1;min-width:0;overflow:hidden;padding-block:7px;mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
+.tk-track{display:inline-flex;gap:36px;white-space:nowrap;padding-left:16px;animation:tick 60s linear infinite}
+.tk-item b{font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--t-wire);margin-right:6px}
+.ticker:hover .tk-track{animation-play-state:paused}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.tk-track{animation:none}.tk-win{overflow-x:auto}}
+.heads{display:flex;flex-direction:column}
+.hd-label{padding:10px 12px 4px;color:color-mix(in srgb,var(--t-wire) 60%,var(--dim))}
+.hd{padding:7px 12px 9px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.hd-out{display:flex;justify-content:space-between;gap:8px;font:500 10.5px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--t-wire)}
+.hd-out span{color:var(--faint);letter-spacing:0;text-transform:none;white-space:nowrap}
+.hd-t{font:600 16px/1.2 var(--f-display);letter-spacing:.01em;color:var(--ink)}
+.hd:not(.new) .hd-t{font-weight:500;color:var(--dim)}
+.hd.fresh{background:color-mix(in srgb,var(--t-wire) 10%,transparent)}
+.mapwrap{grid-area:map}
+@media (max-width:520px){.mapwrap header .label+.label{display:none}}
+.mapview{position:relative;overflow:hidden}
+.mapwrap canvas{display:block;width:100%;cursor:grab;background:var(--sea);touch-action:none;user-select:none;-webkit-user-select:none}
+.mapwrap canvas.grabbing{cursor:grabbing}
+.mapctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:4px;align-items:center}
+.mbtn{width:34px;height:34px;border-radius:4px;border:1px solid var(--line-2);background:color-mix(in srgb,var(--panel) 88%,transparent);color:var(--ink);font:500 18px/1 var(--f-ui);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.mbtn:hover{border-color:var(--brass);color:var(--brass)}
+.mbtn.txt{font:500 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase}
+.zl{font:10px var(--f-mono);color:var(--dim);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 4px;border-radius:3px}
+.tallbtn{position:absolute;top:10px;left:10px;width:auto;padding-inline:10px}
+.mapstatus{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:calc(100% - 40px);text-align:center;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line-2);border-radius:4px;padding:10px 14px;font:12.5px var(--f-mono);color:var(--brass);box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.rcard{position:absolute;left:10px;bottom:10px;max-width:min(280px,calc(100% - 70px));background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line-2);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,.45);backdrop-filter:blur(4px)}
+.rchead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rchead b{font:600 18px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.03em;color:var(--brass)}
+.rcx{background:transparent;border:0;color:var(--dim);font-size:20px;line-height:1;padding:0 2px}
+.rcowner{display:flex;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap}
+.rcinfo{font-size:12px;color:var(--dim)}
+.rcard .btn{align-self:flex-start;padding:5px 10px;font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.fac{grid-area:fac}
+.fac-list{display:flex;flex-direction:column}
+.frow{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.frow:last-child{border-bottom:0}
+.fname{display:flex;align-items:center;gap:8px;min-width:0;font-weight:600}
+.fname span.n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sw{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.pill{font:500 10px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;padding:4px 6px;border-radius:3px;border:1px solid currentColor;white-space:nowrap;align-self:center}
+.pill.player{color:var(--friendly)} .pill.ally{color:#7fb6e8} .pill.neutral{color:var(--neutral)} .pill.hostile{color:var(--unknown)} .pill.war{color:var(--hostile);background:color-mix(in srgb,var(--hostile) 14%,transparent)}
+.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.stat{display:flex;flex-direction:column;gap:3px}
+.stat .k{display:flex;justify-content:space-between;font:11px var(--f-mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.stat .k b{color:var(--ink);font-weight:500}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--dim)}
+.fnote{grid-column:1/-1;font-size:12px;color:var(--dim)}
+
+.cmd{grid-area:cmd}
+.log{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:18px;max-height:68vh;min-height:280px}
+.entry{display:flex;flex-direction:column;gap:6px}
+.entry .stamp{font:11px var(--f-mono);color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.order{align-self:flex-end;max-width:88%;background:var(--panel-2);border:1px solid var(--line-2);border-radius:4px;padding:8px 12px}
+.order .stamp{color:var(--friendly)}
+.order .txt{white-space:pre-wrap;overflow-wrap:anywhere}
+.report .headline{font:600 19px/1.15 var(--f-display);letter-spacing:.02em;text-transform:uppercase;color:var(--brass)}
+.report .prose{font:16px/1.62 var(--f-prose);max-width:68ch;white-space:pre-wrap;overflow-wrap:anywhere}
+.report.pending .prose:empty::before{content:"Field reports coming in…";color:var(--dim);font-style:italic}
+.report .err{font-size:13px;color:#f0a597;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.events{display:flex;flex-wrap:wrap;gap:6px}
+.ev{font:11px var(--f-mono);border:1px solid var(--line-2);border-radius:3px;padding:3px 7px;color:var(--dim)}
+.ev b{font-weight:500}
+.ev.battle b,.ev.strike b{color:var(--hostile)} .ev.capture b{color:var(--brass)} .ev.unrest b{color:var(--unknown)} .ev.diplomacy b{color:var(--friendly)}
+.outcome{border:1px solid var(--brass);color:var(--brass);padding:8px 12px;border-radius:4px;font:600 16px var(--f-display);letter-spacing:.06em;text-transform:uppercase}
+
+.orderbar{border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.modes{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line-2);border-radius:4px;overflow:hidden}
+.mode{background:transparent;border:0;padding:7px 10px;font:600 13px/1.2 var(--f-ui);color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:1px}
+.mode small{font:400 10.5px/1.2 var(--f-mono);letter-spacing:.04em;color:var(--faint)}
+.mode+.mode{border-left:1px solid var(--line-2)}
+.mode.on{background:var(--panel-2);color:var(--ink);box-shadow:inset 0 -2px 0 var(--brass)}
+.mode.on small{color:var(--brass)}
+.talkto{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.talkto select,.talkto input{flex:1 1 180px;min-width:0;background:var(--ground);border:1px solid var(--line-2);border-radius:4px;padding:6px 8px;font-size:13px}
+.say{align-self:flex-end;max-width:88%;background:color-mix(in srgb,var(--friendly) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--friendly) 35%,transparent);border-radius:10px 10px 2px 10px;padding:8px 12px}
+.say .stamp{color:#8fb9ea}
+.say .txt{white-space:pre-wrap;overflow-wrap:anywhere}
+.reply{align-self:flex-start;max-width:92%;background:var(--panel-2);border:1px solid var(--line-2);border-radius:10px 10px 10px 2px;padding:9px 13px}
+.reply .who{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px}
+.reply .who small{font:11px var(--f-mono);color:var(--faint);font-weight:400}
+.reply .prose{font:15.5px/1.55 var(--f-prose);white-space:pre-wrap;overflow-wrap:anywhere}
+.reply.pending .prose:empty::before{content:"…";color:var(--dim)}
+.deal{font:11px var(--f-mono);border:1px solid color-mix(in srgb,var(--brass) 60%,transparent);color:var(--brass);border-radius:3px;padding:4px 8px;align-self:flex-start}
+.deal b{font-weight:600}
+.agreements{padding:10px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.agreements li{font-size:12.5px;color:var(--ink)}
+.agreements ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.agreements small{color:var(--faint);font-family:var(--f-mono)}
+.chip{border:1px solid var(--line-2);background:transparent;border-radius:3px;padding:4px 9px;font-size:12px;color:var(--ink)}
+.chip:hover{border-color:var(--brass);color:var(--brass)}
+.chip.time{color:var(--brass);border-color:color-mix(in srgb,var(--brass) 50%,transparent)}
+.inrow{display:flex;gap:8px;align-items:flex-end}
+.inrow textarea{flex:1;min-width:0;min-height:46px;max-height:180px;resize:none;background:var(--ground);border:1px solid var(--line-2);border-radius:4px;padding:10px 12px;font-size:15px;line-height:1.4}
+.inrow textarea:focus{border-color:var(--brass);outline:none}
+.hint{font-size:11.5px;color:var(--faint)}
+
+.wire{grid-area:wire}
+.feed{display:flex;flex-direction:column}
+.post{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px}
+.post .who{display:flex;gap:6px;align-items:baseline;font-size:13px;min-width:0}
+.post .who b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post .who span{font:11.5px var(--f-mono);color:var(--faint);white-space:nowrap}
+.post .t{font-size:13.5px;overflow-wrap:anywhere}
+.post .when{font:10.5px var(--f-mono);color:var(--faint)}
+.post.fresh{background:color-mix(in srgb,var(--brass) 6%,transparent)}
+
+.chars{grid-area:chars}
+.clist{display:flex;flex-direction:column}
+.crow{cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:9px 12px}
+.crow .cleft{min-width:0;flex:1}
+.crow .cside{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;max-width:45%}
+.talk{border:1px solid var(--line-2);background:transparent;border-radius:3px;padding:3px 9px;font-size:12px;color:var(--friendly)}
+.talk:hover{border-color:var(--friendly)}
+.crow:hover{background:var(--panel-2)}
+.crow .cn{font-weight:600;font-size:13.5px}
+.crow .cr{font-size:12px;color:var(--dim)}
+.crow .cm{font:11px var(--f-mono);color:var(--faint);text-align:right}
+.crow.dead .cn{text-decoration:line-through;color:var(--faint)}
+.empty{padding:14px 12px;color:var(--faint);font-size:13px}
+
+/* ---------- layout: wide = three columns, narrow = one section at a time ---------- */
+.board{flex:1;display:grid;gap:14px;padding-inline:16px;padding-block:14px 20px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:1100px){
+  #game{height:100%}
+  .board{min-height:0;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(250px,.72fr);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"map cmd wire" "fac cmd chars";}
+  .mapwrap{grid-area:map} .cmd{grid-area:cmd;min-height:0} .fac{grid-area:fac} .wire{grid-area:wire} .chars{grid-area:chars}
+  .wire,.fac,.chars{min-height:0;overflow:auto}
+  .log{max-height:none;min-height:0}
+  .tabbar,.narrow-only{display:none!important}
+}
+@media (max-width:1099px){
+  .wide-only{display:none!important}
+  .board{display:block;padding-block:12px calc(76px + env(safe-area-inset-bottom,0px))}
+  .board>.panel{display:none}
+  .board[data-view="cmd"]>.cmd,.board[data-view="map"]>.mapwrap,.board[data-view="fac"]>.fac,.board[data-view="wire"]>.wire,.board[data-view="chars"]>.chars{display:flex}
+  .log{max-height:none;min-height:45vh;overflow:visible}
+  .orderbar{position:sticky;bottom:calc(60px + env(safe-area-inset-bottom,0px));z-index:3;background:color-mix(in srgb,var(--t-cmd) 4%,var(--panel));border-radius:0 0 4px 4px;box-shadow:0 -10px 18px rgba(5,8,9,.55)}
+  .topbar{position:static;padding-block:8px}
+  .topbar .title h2{font-size:19px}
+  .mapwrap header .label+.label{display:none}
+  .topbar{flex-wrap:nowrap;gap:10px}
+  .topbar .title{flex:1 1 0}
+  .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-12px;padding-inline:12px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex-shrink:0}
+  #modeHint{display:none}
+}
+@media (max-width:430px){.inboxbtn .lbl{display:none}.inboxbtn{padding-inline:10px}}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:9;display:grid;grid-template-columns:repeat(5,1fr);background:color-mix(in srgb,var(--ground) 94%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line-2);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar button{position:relative;height:58px;background:transparent;border:0;color:var(--dim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 10.5px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
+.tabbar svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button.on{color:var(--brass)}
+.tabbar button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--brass);border-radius:0 0 2px 2px}
+.tabbar .dot{position:absolute;top:9px;left:calc(50% + 9px);width:7px;height:7px;border-radius:50%;background:var(--t-wire)}
+
+/* compact top bar */
+.topbar .title .sub{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline}
+.ledger-mini{font:11.5px var(--f-mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.ledger-mini b{color:var(--ink);font-weight:500}
+.inboxbtn{position:relative}
+.inboxbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--hostile);color:#fff;font:600 11px/18px var(--f-ui);text-align:center}
+.moremenu{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);z-index:12;min-width:190px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:4px;display:flex;flex-direction:column;box-shadow:0 10px 26px rgba(0,0,0,.5)}
+.menu button{background:transparent;border:0;text-align:left;padding:10px 12px;border-radius:4px;font-size:14px}
+.menu button:hover{background:var(--panel)}
+
+/* inbox drawer */
+.drawer-bg{position:fixed;inset:0;background:rgba(4,7,8,.6);z-index:30}
+.drawer{position:fixed;top:0;right:0;bottom:0;z-index:31;width:min(440px,100%);background:var(--panel);border-left:1px solid var(--line-2);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:-16px 0 40px rgba(0,0,0,.5)}
+.drawer>header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--brass) 7%,transparent)}
+.drawer h3{font-size:24px;text-transform:uppercase;letter-spacing:.04em}
+.ib-hback{background:transparent;border:0;padding:4px 0;font:600 20px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--brass)}
+.ib-body{flex:1;overflow:auto;overscroll-behavior:contain}
+.ib-item{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);padding:11px 16px;color:var(--dim)}
+.ib-item:hover{background:var(--panel-2)}
+.ib-item.unread{color:var(--ink);background:color-mix(in srgb,var(--brass) 5%,transparent);box-shadow:inset 3px 0 0 var(--brass)}
+.ib-row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.ib-d{font:11px var(--f-mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib-s{font:600 16px/1.2 var(--f-display);letter-spacing:.01em}
+.ib-item:not(.unread) .ib-s{font-weight:500}
+.ib-f{display:flex;align-items:center;gap:6px;font-size:12.5px}
+.ib-kind{font:600 10px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;padding:3px 6px;border-radius:3px;border:1px solid currentColor;align-self:flex-start}
+.k-report{color:#7fb6e8} .k-letter,.k-cable{color:var(--brass)} .k-demand,.k-alert{color:var(--hostile)} .k-offer{color:var(--neutral)} .k-intel{color:#ad9ff0}
+.ib-read{padding:14px 16px 20px;display:flex;flex-direction:column;gap:8px}
+.ib-back{align-self:flex-start;padding:5px 10px;font-size:12.5px}
+.ib-subj{margin:4px 0 0;font:600 24px/1.1 var(--f-display);letter-spacing:.01em;text-wrap:balance}
+.ib-from{display:flex;align-items:center;gap:6px;font-size:13.5px;flex-wrap:wrap}
+.ib-date{font:11.5px var(--f-mono);color:var(--faint)}
+.ib-text{font:16px/1.6 var(--f-prose);white-space:pre-wrap;overflow-wrap:anywhere;padding:12px 14px;background:color-mix(in srgb,var(--t-wire) 6%,var(--ground));border:1px solid var(--line);border-radius:4px}
+.ib-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.standing{padding:14px 16px 18px;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:8px;background:color-mix(in srgb,var(--t-cmd) 4%,transparent)}
+.standing ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.standing li{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+.stform{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 8px;align-items:center}
+.stform select,.stform input{width:100%;min-width:0;background:var(--ground);border:1px solid var(--line-2);border-radius:4px;padding:7px 9px;font-size:13px}
+.stform .btn{grid-column:2;justify-self:start}
+body.drawer-open{overflow:hidden}
+
+/* toast */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:25;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:8px 8px 8px 14px;border-radius:6px;background:var(--panel-2);border:1px solid var(--brass);box-shadow:0 10px 26px rgba(0,0,0,.5);font-size:13.5px}
+.toast .btn{padding:6px 10px;font-size:12.5px;white-space:nowrap}
+@media (min-width:1100px){.toast{bottom:24px}}
+.deal.std{border-color:color-mix(in srgb,#7fb6e8 60%,transparent);color:#7fb6e8}
+
+/* dialog */
+.overlay{position:fixed;inset:0;background:rgba(5,8,9,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.dialog{background:var(--panel);border:1px solid var(--line-2);border-radius:6px;padding:18px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:12px}
+.dialog .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+@media (prefers-reduced-motion:no-preference){
+  .post.fresh{animation:flash 1.6s ease-out}
+  @keyframes flash{from{background:color-mix(in srgb,var(--brass) 22%,transparent)}}
+}
+</style>
+
+<!-- ================= SETUP ================= -->
+<section id="setup">
+  <div class="brand">
+    <div class="label">AI war simulation · type your orders</div>
+    <h1>Theater <span>of</span> War</h1>
+    <p>Pick a war or describe your own. Then command it in plain words: move armies, strike targets, cut deals, interrogate prisoners, talk to your generals. The world fights back.</p>
+  </div>
+  <div id="claudeNotice" class="notice" hidden>Claude isn't available in this view. Open this page inside Claude to play — you can still look around.</div>
+
+  <div class="saves" id="savesBox" hidden>
+    <div class="label">Your campaigns</div>
+    <div class="save-list" id="saveList"></div>
+  </div>
+
+  <div class="label">Start a new war</div>
+  <div class="scen-grid" id="scenGrid"></div>
+</section>
+
+<!-- ================= GAME ================= -->
+<section id="game" hidden>
+  <div class="topbar">
+    <div class="title"><h2 id="gTitle"></h2><div class="sub"><span id="gDate"></span><span class="ledger-mini">Turn <b id="gTurn">1</b> · Losses <b id="gLossP">0</b> ours / <b id="gLossE">0</b> theirs</span></div></div>
+    <div class="acts">
+      <span class="savestate wide-only" id="saveState"></span>
+      <button class="btn inboxbtn" id="inboxBtn" type="button" aria-label="Inbox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></svg><span class="lbl">Inbox</span><span class="badge" id="inboxBadge" hidden>0</span></button>
+      <button class="btn ghost wide-only" id="undoBtn" type="button" title="Undo the last turn" disabled>Undo turn</button>
+      <button class="btn ghost wide-only" id="menuBtn" type="button">Campaigns</button>
+      <div class="moremenu narrow-only"><button class="btn ghost" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
+        <div class="menu" id="moreMenu" hidden><button type="button" id="undoBtn2">Undo last turn</button><button type="button" id="campBtn2">Campaigns</button></div></div>
+    </div>
+  </div>
+  <div class="ticker" id="ticker" aria-label="Latest headlines"><span class="tk-label">Latest</span><div class="tk-win"><div class="tk-track" id="tkTrack"></div></div></div>
+
+  <div class="board" data-view="cmd">
+    <div class="panel mapwrap">
+      <header><span class="label">Situation map</span><span class="label" style="color:var(--faint)">drag to move · pinch or scroll to zoom</span></header>
+      <div class="mapview">
+        <canvas id="map" aria-label="Situation map. Drag to move, pinch or scroll to zoom, tap a region for details."></canvas>
+        <div class="mapctl">
+          <button class="mbtn" id="zoomIn" type="button" aria-label="Zoom in">+</button>
+          <button class="mbtn" id="zoomOut" type="button" aria-label="Zoom out">−</button>
+          <button class="mbtn txt" id="zoomFit" type="button">Fit</button>
+          <span class="zl" id="zoomLvl">1.0×</span>
+        </div>
+        <button class="mbtn txt tallbtn" id="mapTall" type="button" aria-pressed="false">Bigger</button>
+        <div class="mapstatus" id="mapStatus" role="status" hidden></div>
+        <div class="rcard" id="regionCard" hidden>
+          <div class="rchead"><b id="rcName"></b><button class="rcx" id="rcClose" type="button" aria-label="Close">×</button></div>
+          <div class="rcowner" id="rcOwner"></div>
+          <div class="rcinfo" id="rcInfo"></div>
+          <button class="btn primary" id="rcUse" type="button">Add to my order</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel cmd">
+      <header><span class="label">Dispatches</span><span class="label" id="busyLbl" style="color:var(--brass)"></span></header>
+      <div class="log" id="log" aria-live="polite"></div>
+      <div class="orderbar">
+        <div class="modes" role="group" aria-label="What you want to do">
+          <button type="button" class="mode on" data-mode="order" aria-pressed="true">Give order<small>takes a turn</small></button>
+          <button type="button" class="mode" data-mode="talk" aria-pressed="false">Talk<small>no time passes</small></button>
+        </div>
+        <div class="talkto" id="talkTo" hidden>
+          <label class="label" for="talkSel">Talking to</label>
+          <select id="talkSel"></select>
+          <input id="talkNew" placeholder="Who? e.g. my chief of staff" hidden>
+        </div>
+        <div class="chips" id="chips"></div>
+        <form class="inrow" id="orderForm">
+          <textarea id="orderIn" rows="2" placeholder="Give an order… e.g. “Send the 3rd Armored to hold the river crossing at dawn”" aria-label="Your order"></textarea>
+          <button class="btn primary" id="sendBtn" type="submit">Send</button>
+          <button class="btn danger" id="stopBtn" type="button" hidden>Stop</button>
+        </form>
+        <div class="hint" id="modeHint">Orders take a turn and time passes. To talk to someone without using a turn, switch to Talk.</div>
+      </div>
+    </div>
+
+    <div class="panel fac"><header><span class="label">Powers</span></header><div class="fac-list" id="facList"></div></div>
+    <div class="panel wire"><header><span class="label">The Wire</span><span class="label" style="color:var(--faint)">news &amp; voices</span></header><div class="heads" id="heads"></div><div class="feed" id="feed"></div></div>
+    <div class="panel chars"><header><span class="label">Key figures</span><span class="label" style="color:var(--faint)">tap to talk</span></header><div class="clist" id="charList"></div></div>
+  </div>
+  <nav class="tabbar" id="tabbar" aria-label="Sections">
+    <button type="button" data-view="cmd" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>Orders</button>
+    <button type="button" data-view="map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Map</button>
+    <button type="button" data-view="fac"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>Powers</button>
+    <button type="button" data-view="wire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M7 9h7M7 13h7"/></svg>Wire<i class="dot" id="wireDot" hidden></i></button>
+    <button type="button" data-view="chars"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14.8c2 .6 3.2 2.5 3.5 5.2"/></svg>People</button>
+  </nav>
+
+  <div class="drawer-bg" id="inboxBg" hidden></div>
+  <aside class="drawer" id="inbox" hidden aria-label="Inbox" role="dialog">
+    <header><button class="ib-hback" id="ibHBack" type="button" hidden>‹ Inbox</button><h3 id="ibTitle">Inbox</h3><button class="rcx" id="inboxClose" type="button" aria-label="Close inbox">×</button></header>
+    <div class="ib-body">
+      <div id="ibList"></div>
+      <div id="ibRead" class="ib-read" hidden></div>
+      <section class="standing" id="ibStanding">
+        <div class="label">Regular reports</div>
+        <ul id="stList"></ul>
+        <form id="stForm" class="stform">
+          <label class="label" for="stWho">Ask</label>
+          <select id="stWho"></select>
+          <label class="label" for="stWhat">for</label>
+          <input id="stWhat" placeholder="e.g. weekly report on air force readiness">
+          <button class="btn" type="submit">Set up</button>
+        </form>
+      </section>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" hidden role="status"><span id="toastText"></span><button class="btn primary" id="toastOpen" type="button">Open inbox</button><button class="rcx" id="toastClose" type="button" aria-label="Dismiss">×</button></div>
+</section>
+
+<div class="overlay" id="confirmBox" hidden>
+  <div class="dialog" role="dialog" aria-modal="true">
+    <div id="confirmText"></div>
+    <div class="row"><button class="btn ghost" id="confirmNo">Cancel</button><button class="btn danger" id="confirmYes">Delete</button></div>
+  </div>
+</div>
+
+<script>
+/* ===================== PRESET WORLDS ===================== */
+const PRESETS = [
+{
+  key:"iron-winter",
+  geo:true,
+  title:"Iron Winter, 1983",
+  era:"Cold War gone hot · Central Europe",
+  blurb:"A NATO exercise is misread in Moscow. Before dawn, Warsaw Pact armor pours through the Fulda Gap. You have days, not weeks.",
+  premise:"November 1983. A NATO command exercise was mistaken by the Soviet leadership for cover for a first strike. The Warsaw Pact has launched a conventional offensive into West Germany. Nuclear release is possible but catastrophic for everyone. Era-appropriate 1983 technology only.",
+  date:"4 November 1983, 04:10",
+  player:"nato",
+  factions:[
+    {id:"nato",name:"NATO Central Front",leader:"Gen. Harlan Voss",strength:62,economy:78,morale:58,stance:"player",note:"Outnumbered in tanks. Reinforcements from the US are 10 days out."},
+    {id:"wp",name:"Warsaw Pact Western Front",leader:"Marshal Arkady Belov",strength:81,economy:55,morale:70,stance:"war",note:"Three tank armies committed. Second echelon waiting in Poland."},
+    {id:"fr",name:"French Republic",leader:"President's War Cabinet",strength:58,economy:66,morale:60,stance:"ally",note:"Outside NATO command. Undecided about committing its army."},
+    {id:"at",name:"Republic of Austria",leader:"Chancellor Weiss",strength:20,economy:50,morale:55,stance:"neutral",note:"Neutral, terrified, and in the path of any southern flank."}
+  ],
+  regions:[
+    {id:"cph",lat:55.68,lon:12.57,countries:["Denmark"],name:"Copenhagen",x:63,y:6,owner:"nato",terrain:"coast"},
+    {id:"ham",lat:53.55,lon:9.99,countries:["Germany"],name:"Hamburg",x:43,y:20,owner:"nato",terrain:"port city"},
+    {id:"bre",lat:53.08,lon:8.8,countries:["Germany"],name:"Bremen",x:29,y:25,owner:"nato",terrain:"port city"},
+    {id:"han",lat:52.37,lon:9.73,countries:["Germany"],name:"Hanover",x:41,y:37,owner:"nato",terrain:"plains"},
+    {id:"ruh",lat:51.45,lon:7.01,countries:["Germany"],name:"Ruhr",x:15,y:44,owner:"nato",terrain:"industrial"},
+    {id:"kas",lat:51.31,lon:9.48,countries:["Germany"],name:"Kassel",x:38,y:52,owner:"nato",terrain:"hills"},
+    {id:"ful",lat:50.55,lon:9.68,countries:["Germany"],name:"Fulda Gap",x:47,y:61,owner:"nato",terrain:"lowland corridor",contested:true},
+    {id:"fra",lat:50.11,lon:8.68,countries:["Germany"],name:"Frankfurt",x:32,y:67,owner:"nato",terrain:"city"},
+    {id:"nur",lat:49.45,lon:11.08,countries:["Germany"],name:"Nuremberg",x:55,y:77,owner:"nato",terrain:"city"},
+    {id:"mun",lat:48.14,lon:11.58,countries:["Germany"],name:"Munich",x:57,y:92,owner:"nato",terrain:"city"},
+    {id:"str",lat:48.57,lon:7.75,countries:["France"],name:"Strasbourg",x:19,y:84,owner:"fr",terrain:"river city"},
+    {id:"ber",lat:52.52,lon:13.4,countries:["Germany"],name:"Berlin",x:75,y:31,owner:"wp",terrain:"divided city",contested:true},
+    {id:"ros",lat:54.09,lon:12.1,countries:["Germany"],name:"Rostock",x:69,y:13,owner:"wp",terrain:"port"},
+    {id:"mag",lat:52.13,lon:11.63,countries:["Germany"],name:"Magdeburg",x:60,y:38,owner:"wp",terrain:"plains"},
+    {id:"erf",lat:50.98,lon:11.03,countries:["Germany"],name:"Erfurt",x:54,y:53,owner:"wp",terrain:"forest"},
+    {id:"lei",lat:51.34,lon:12.37,countries:["Germany"],name:"Leipzig",x:67,y:50,owner:"wp",terrain:"city"},
+    {id:"dre",lat:51.05,lon:13.74,countries:["Germany"],name:"Dresden",x:82,y:58,owner:"wp",terrain:"city"},
+    {id:"pra",lat:50.08,lon:14.43,countries:["Czech Rep."],name:"Prague",x:84,y:76,owner:"wp",terrain:"city"},
+    {id:"vie",lat:48.21,lon:16.37,countries:["Austria"],name:"Vienna",x:90,y:94,owner:"at",terrain:"city"},
+    {id:"war",lat:52.23,lon:21.01,countries:["Poland"],name:"Warsaw",x:97,y:34,owner:"wp",terrain:"capital, second echelon"},
+    {id:"bru",lat:50.85,lon:4.35,countries:["Belgium","Netherlands","Luxembourg"],name:"Brussels",x:4,y:56,owner:"nato",terrain:"NATO headquarters city"},
+    {id:"lon",lat:51.51,lon:-0.13,countries:["United Kingdom"],name:"London",x:2,y:30,owner:"nato",terrain:"capital"}
+  ],
+  characters:[
+    {name:"Gen. Harlan Voss",role:"Your theater commander",faction:"nato",mood:"steady, worried about ammo"},
+    {name:"Col. Ingrid Brandt",role:"Bundeswehr 1st Panzer Division",faction:"nato",mood:"wants to counterattack now"},
+    {name:"Maj. Tom Reyes",role:"Intelligence officer",faction:"nato",mood:"sleepless"},
+    {name:"Amb. Claire Fontaine",role:"French liaison",faction:"fr",mood:"guarded"},
+    {name:"Marshal Arkady Belov",role:"Enemy front commander",faction:"wp",mood:"confident"}
+  ],
+  headline:"Armor across the border",
+  opening:"The phone in your command bunker outside Heidelberg rings at 03:52. By 04:10 the reports are stacked three deep. Soviet 8th Guards Army has crossed the inner German border on a forty-kilometer front and is driving for the Fulda Gap. The US V Corps covering force is in contact and falling back by bounds. In the north, radar shows helicopters over the Elbe. West Berlin's garrison is cut off.\n\nGeneral Voss is at the map table. \"We can trade space for time, or we can stand at the Gap and bleed them. We can't do both,\" he says. Bonn wants to know if you'll ask for nuclear release. Paris hasn't called back.\n\nYour forces are waiting for orders.",
+  feed:[
+    {author:"AFN Radio Frankfurt",handle:"afn_ffm",faction:"nato",text:"All military personnel report to your units immediately. This is not an exercise."},
+    {author:"Liesel M.",handle:"liesel_fulda",faction:"",text:"Tanks on the B27. Hundreds. My father is loading the car."},
+    {author:"TASS",handle:"tass",faction:"wp",text:"Fraternal forces have acted to prevent imminent NATO aggression against the socialist community."}
+  ],
+  headlines:[{outlet:"Stars and Stripes",text:"Soviet armor crosses inner German border"},{outlet:"Le Monde",text:"Paris weighs its options as war returns to Europe"},{outlet:"Pravda",text:"NATO provocation met with fraternal resolve"},{outlet:"BBC World Service",text:"West Berlin cut off; airports closed across Germany"}],
+  suggestions:["Hold the Fulda Gap at all costs","Fall back to the Weser line","Ask France to commit its army"]
+},
+{
+  key:"sundered-crown",
+  title:"The Sundered Crown",
+  era:"Fantasy · swords, sorcery, siege",
+  blurb:"The old king is dead without an heir. The Ashmark horde smells weakness, the Pale Flame preaches holy war, and the merchant cities sell to everyone.",
+  premise:"A medieval fantasy realm. Magic exists but is rare and costly: battle-mages, wards, cursed relics. The kingdom of Varn is leaderless after the old king's death; the player rules as Regent. Armies are levies, knights, mercenaries and siege engines. Winter makes campaigning hard.",
+  date:"Day 3 of Frostmonth, Year 412 of the Crown",
+  player:"varn",
+  factions:[
+    {id:"varn",name:"Kingdom of Varn",leader:"You, as Regent",strength:55,economy:60,morale:48,stance:"player",note:"Lords are quarreling over the succession."},
+    {id:"ash",name:"Ashmark Horde",leader:"Warchief Ghazrak the Ashborn",strength:72,economy:30,morale:80,stance:"war",note:"Raiders and ash-shamans massing at Redmarch."},
+    {id:"pale",name:"Order of the Pale Flame",leader:"High Prelate Ilsabet",strength:45,economy:52,morale:85,stance:"hostile",note:"Zealots who claim the crown belongs to the Flame."},
+    {id:"free",name:"Free Cities League",leader:"Guildmaster Corvin Hale",strength:35,economy:88,morale:50,stance:"neutral",note:"Rich, unloyal, owns most of the mercenaries."}
+  ],
+  regions:[
+    {id:"vh",name:"Varnholt",x:30,y:40,owner:"varn",terrain:"capital"},
+    {id:"km",name:"Kelmoor",x:34,y:22,owner:"varn",terrain:"moors"},
+    {id:"tf",name:"Thornfield",x:16,y:30,owner:"varn",terrain:"farmland"},
+    {id:"gw",name:"Greywater",x:20,y:56,owner:"varn",terrain:"marsh"},
+    {id:"of",name:"Osric's Ford",x:42,y:52,owner:"varn",terrain:"river crossing"},
+    {id:"wp",name:"Wyrmback Peaks",x:52,y:16,owner:null,terrain:"mountains"},
+    {id:"rm",name:"Redmarch",x:58,y:38,owner:"ash",terrain:"burned frontier",contested:true},
+    {id:"cs",name:"Cinder Steppe",x:68,y:26,owner:"ash",terrain:"steppe"},
+    {id:"am",name:"Ashmark",x:80,y:16,owner:"ash",terrain:"volcanic"},
+    {id:"bs",name:"Blackspire",x:87,y:38,owner:"ash",terrain:"fortress"},
+    {id:"hm",name:"Hollowmere",x:60,y:62,owner:"pale",terrain:"lakeland"},
+    {id:"pa",name:"Pale Abbey",x:75,y:72,owner:"pale",terrain:"cathedral town"},
+    {id:"sr",name:"Saltreach",x:48,y:82,owner:"free",terrain:"port"},
+    {id:"pam",name:"Port Amberly",x:28,y:86,owner:"free",terrain:"port"},
+    {id:"li",name:"Lantern Isle",x:10,y:93,owner:"free",terrain:"island"}
+  ],
+  characters:[
+    {name:"Lord Marshal Edda Kain",role:"Commander of your army",faction:"varn",mood:"loyal, blunt"},
+    {name:"Wren",role:"Your spymaster",faction:"varn",mood:"knows more than she says"},
+    {name:"Master Oduin",role:"Court battle-mage",faction:"varn",mood:"old and tired"},
+    {name:"Warchief Ghazrak",role:"Leader of the Ashmark Horde",faction:"ash",mood:"hungry"},
+    {name:"High Prelate Ilsabet",role:"Voice of the Pale Flame",faction:"pale",mood:"serene and dangerous"},
+    {name:"Guildmaster Corvin Hale",role:"Head of the Free Cities",faction:"free",mood:"counting coins"}
+  ],
+  headline:"Smoke over Redmarch",
+  opening:"Snow is falling on Varnholt when the riders come in. Redmarch is burning. Ashmark raiders crossed the frontier two nights ago and the border keeps are holding by fingernails. Lord Marshal Kain has three thousand men in the city and another four thousand promised by lords who haven't arrived.\n\nIn the great hall, the lords argue about who should wear the crown while you hold the regency. Wren leans close: \"The Pale Flame has sent a delegation. They'll offer help. They'll want a price.\" Guildmaster Hale's letter sits unopened on the table, sealed in gold wax.\n\nThe hall goes quiet when you stand.",
+  feed:[
+    {author:"Town crier of Varnholt",handle:"crier_vh",faction:"varn",text:"All able men of the levy to muster at the Kingsgate by first bell."},
+    {author:"A refugee from Redmarch",handle:"no name given",faction:"",text:"They came with fire that didn't go out in snow. The keep's still standing. I don't know for how long."},
+    {author:"Sister Maren",handle:"paleflame_maren",faction:"pale",text:"The crown sits empty because the realm forgot the Flame. Repent, and the Flame will defend you."}
+  ],
+  headlines:[{outlet:"Varnholt Herald",text:"Redmarch burns as Ashmark raiders cross the frontier"},{outlet:"Saltreach Ledger",text:"Grain prices double as the north roads close"},{outlet:"The Flame's Lantern",text:"The empty throne is a judgment, say the Prelates"}],
+  suggestions:["March to relieve Redmarch","Hear the Pale Flame's offer","Hire mercenaries from the Free Cities"]
+},
+{
+  key:"archipelago-2041",
+  title:"Archipelago War, 2041",
+  era:"Near future · drones, cyber, naval",
+  blurb:"Two island powers fight over the Meridian Strait and the chip foundry beneath it. Drone swarms, cable cuts, and a world watching.",
+  premise:"Year 2041, fictional island nations. Warfare is drone swarms, hypersonic missiles, cyberattacks on grids and undersea cables, satellite blinding, naval task forces and information war. Global markets react. Escalation to nuclear use is possible but would be world-ending.",
+  date:"17 March 2041, 06:00 local",
+  player:"hal",
+  factions:[
+    {id:"hal",name:"Halvane Republic",leader:"President Mara Quill",strength:58,economy:74,morale:66,stance:"player",note:"Superior submarines. Smaller drone stockpile."},
+    {id:"kesh",name:"Kesh Directorate",leader:"Director Han Vesk",strength:74,economy:68,morale:61,stance:"war",note:"Seized the Meridian Strait foundry 48 hours ago."},
+    {id:"thule",name:"Thule Compact",leader:"Council of Thule",strength:62,economy:80,morale:55,stance:"neutral",note:"Controls the northern shipping lanes. Wants calm markets."},
+    {id:"saro",name:"Saro Free States",leader:"Speaker Tomas Aru",strength:30,economy:45,morale:50,stance:"neutral",note:"Kesh is pressuring them for basing rights."}
+  ],
+  regions:[
+    {id:"ph",name:"Port Halvane",x:20,y:30,owner:"hal",terrain:"capital port"},
+    {id:"ki",name:"Kestrel Isle",x:10,y:50,owner:"hal",terrain:"airbase island"},
+    {id:"mb",name:"Merrow Bay",x:28,y:55,owner:"hal",terrain:"naval base"},
+    {id:"va",name:"Vigil Atoll",x:38,y:24,owner:"hal",terrain:"radar atoll"},
+    {id:"ms",name:"Meridian Strait",x:50,y:45,owner:"kesh",terrain:"undersea foundry",contested:true},
+    {id:"is",name:"Iron Shoals",x:64,y:24,owner:"kesh",terrain:"artificial islands"},
+    {id:"tr",name:"Taran Reef",x:70,y:46,owner:"kesh",terrain:"missile batteries"},
+    {id:"kp",name:"Kesh Prime",x:84,y:30,owner:"kesh",terrain:"capital megacity"},
+    {id:"ss",name:"Solace Station",x:88,y:58,owner:"kesh",terrain:"space launch site"},
+    {id:"th",name:"Thule",x:52,y:8,owner:"thule",terrain:"trade hub"},
+    {id:"nh",name:"Nordhaven",x:34,y:8,owner:"thule",terrain:"shipping port"},
+    {id:"ek",name:"Ember Keys",x:38,y:76,owner:"saro",terrain:"islands"},
+    {id:"sa",name:"Saro",x:54,y:82,owner:"saro",terrain:"capital"},
+    {id:"lm",name:"Lowmarsh",x:70,y:76,owner:"saro",terrain:"wetlands"}
+  ],
+  characters:[
+    {name:"Adm. Sela Okoye",role:"Commander, Halvane Fleet",faction:"hal",mood:"ready to sail"},
+    {name:"Dr. Ivo Lind",role:"Head of Cyber Command",faction:"hal",mood:"has something nasty prepared"},
+    {name:"President Mara Quill",role:"Your head of state",faction:"hal",mood:"under pressure from parliament"},
+    {name:"Director Han Vesk",role:"Ruler of Kesh",faction:"kesh",mood:"calculating"},
+    {name:"Speaker Tomas Aru",role:"Leader of Saro",faction:"saro",mood:"afraid of both sides"}
+  ],
+  headline:"The Strait goes dark",
+  opening:"At 05:40 the last Halvane cable through the Meridian Strait goes silent. Satellite passes show Kesh marines dug in around the foundry domes and a screen of autonomous patrol boats across the channel. Two of your radar pickets on Vigil Atoll were blinded overnight by ground-based lasers.\n\nIn the war room beneath Port Halvane, Admiral Okoye has the fleet at two hours' notice. Dr. Lind slides a tablet across the table: \"Kesh's grid has a door I can open. Once.\" President Quill's line is blinking. Thule's markets open in three hours, and the whole world is watching what you do first.",
+  feed:[
+    {author:"Halvane Public Broadcast",handle:"hpb_news",faction:"hal",text:"Government confirms loss of contact with Meridian Strait facilities. Citizens asked to remain calm."},
+    {author:"Thule Exchange Desk",handle:"thule_markets",faction:"thule",text:"Chip futures limit-up in pre-market. Shipping insurers suspend cover south of the 40th parallel."},
+    {author:"Kesh Directorate Office",handle:"kesh_official",faction:"kesh",text:"The Meridian Foundry is now under lawful Directorate protection. Any aggression will be answered."}
+  ],
+  headlines:[{outlet:"Halvane Public Broadcast",text:"Last Strait cable goes silent; foundry contact lost"},{outlet:"Thule Exchange Daily",text:"Chip futures halted as insurers flee southern lanes"},{outlet:"Kesh Voice",text:"Directorate secures Meridian Foundry 'for all peoples'"},{outlet:"Saro Morning Post",text:"Kesh envoy demands harbor access in Saro"}],
+  suggestions:["Send the fleet to retake the Strait","Have Dr. Lind hit Kesh's grid","Call Thule to broker a ceasefire"]
+}
+];
+
+/* ===================== STATE ===================== */
+const PAL_OTHERS=["#c4503f","#c8963c","#8b6cc4","#3fa597","#c46a9a","#8fa04a","#b07b52"];
+const FRIENDLY="#4f8fd6";
+let S=null;              // current game state
+let history=[];          // undo stack (in-memory)
+let sample=null, db=null, uid=null;
+let busy=false, ctl=null, lastOrder="";
+let saveSeq=Promise.resolve();
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const clamp=n=>Math.max(0,Math.min(100,Math.round(Number(n)||0)));
+const uidGen=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+function factionColor(id){
+  if(!S||id==null) return "#56625d";
+  const f=S.factions.find(f=>f.id===id); if(!f) return "#56625d";
+  if(f.id===S.player) return FRIENDLY;
+  if(!f.color){const used=S.factions.filter(x=>x.color).map(x=>x.color);f.color=PAL_OTHERS.find(c=>!used.includes(c))||PAL_OTHERS[S.factions.indexOf(f)%PAL_OTHERS.length];}
+  return f.color;
+}
+function newGameFrom(p){
+  const g={v:1,id:uidGen(),title:p.title,premise:p.premise,date:p.date,turn:1,player:p.player,
+    chronicle:p.chronicle||p.opening.slice(0,500),
+    factions:p.factions.map(f=>({...f,strength:clamp(f.strength),economy:clamp(f.economy),morale:clamp(f.morale)})),
+    regions:p.regions.map(r=>({...r,x:Number(r.x),y:Number(r.y),contested:!!r.contested})),
+    characters:(p.characters||[]).map(c=>({...c})),
+    feed:(p.feed||[]).map(x=>({...x,date:p.date})),
+    headlines:(p.headlines&&p.headlines.length?p.headlines:[{outlet:"Wire report",text:p.headline||p.title}]).map(h=>({outlet:String(h.outlet||"Wire report"),text:String(h.text),date:p.date,turn:0})),
+    log:[{kind:"report",turn:0,date:p.date,headline:p.headline||"",text:p.opening,events:[]}],
+    events:[],agreements:[],inbox:[],standing:[],casualties:{player:0,enemy:0},suggestions:p.suggestions||[],outcome:null,
+    geo:!!p.geo,geoChecked:p.geoChecked??(p.geo!==undefined?true:!!p.key),moves:[],
+    created:Date.now(),updated:Date.now()};
+  return g;
+}
+
+/* ===================== MAP ===================== */
+function hexToRgb(h){h=h.replace("#","");return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function mix(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function hash2(x,y){let h=Math.imul(x|0,374761393)+Math.imul(y|0,668265263);h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967295;}
+function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash2(xi,yi),b=hash2(xi+1,yi),c=hash2(xi,yi+1),d=hash2(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;}
+function fbm(x,y){return vnoise(x,y)*.5+vnoise(x*2.07+17,y*2.07+9)*.25+vnoise(x*4.3+3,y*4.3+41)*.15+vnoise(x*8.9+29,y*8.9+5)*.1;}
+function terrainClass(t){t=String(t||"").toLowerCase();
+  if(/mount|peak|alp|ridge|highland|volcan|crag|summit|spire/.test(t))return"mtn";
+  if(/forest|wood|jungle|grove|taiga/.test(t))return"forest";
+  if(/marsh|swamp|wetland|bog|lake|delta|fen/.test(t))return"marsh";
+  if(/desert|steppe|dune|waste|burn|ash|arid|badland/.test(t))return"arid";
+  if(/hill|moor|upland|plateau/.test(t))return"hill";
+  return"plain";}
+function isCity(t){return /city|capital|port|town|megacity|station|base|fortress|keep|abbey|hub|cathedral|atoll/i.test(String(t||""));}
+const TERRAIN_BASE={plain:"#3d4a35",hill:"#4a4a36",mtn:"#5b5a52",forest:"#2c3f2c",marsh:"#2f4440",arid:"#5e5238"};
+function ownerColorIn(state,id){
+  if(id==null) return "#5f6863";
+  const f=state.factions.find(f=>f.id===id); if(!f) return "#5f6863";
+  if(f.id===state.player) return FRIENDLY;
+  return f.color||PAL_OTHERS[state.factions.indexOf(f)%PAL_OTHERS.length];
+}
+function atWar(state,a,b){
+  if(a==null||b==null||a===b) return false;
+  const fa=state.factions.find(f=>f.id===a), fb=state.factions.find(f=>f.id===b);
+  if(a===state.player) return fb?.stance==="war";
+  if(b===state.player) return fa?.stance==="war";
+  return false;
+}
+/* Build the terrain + territory bitmap. bw x bh pixels, regions on a 0-100 grid. */
+function buildWorld(state,bw,bh){
+  const off=document.createElement("canvas");off.width=bw;off.height=bh;
+  const octx=off.getContext("2d");const img=octx.createImageData(bw,bh);const d=img.data;
+  const regs=state.regions; const n=Math.max(1,regs.length);
+  const aspect=bh/bw, ppu=bw/100;              // pixels per map unit
+  const seaR=Math.min(28,100/Math.sqrt(n)*0.98);
+  const own=regs.map(r=>hexToRgb(ownerColorIn(state,r.owner)));
+  const cls=regs.map(r=>terrainClass(r.terrain));
+  const base=cls.map(c=>hexToRgb(TERRAIN_BASE[c]));
+  const tint=regs.map((r,i)=>mix(base[i],own[i],r.owner==null?0.15:0.55));
+  const seaA=hexToRgb("#10232a"), seaB=hexToRgb("#081419"), contour=hexToRgb("#1a3640"), coast=hexToRgb("#c9c3a5");
+  const dark=hexToRgb("#0a0f10"), red=hexToRgb("#e0523e"), snow=hexToRgb("#e9e6da");
+  const bTh=0.5/ppu*4;                          // ~2px border
+  for(let py=0;py<bh;py++){
+    const v=py/bh*100;
+    for(let px=0;px<bw;px++){
+      const u=px/bw*100;
+      const nA=fbm(u*.055,v*.055), nB=fbm(u*.055+50,v*.055+50);
+      const wu=u+(nA-.5)*11, wv=v+(nB-.5)*11;
+      let b1=1e9,b2=1e9,i1=-1,i2=-1;
+      for(let i=0;i<regs.length;i++){
+        const dx=wu-regs[i].x, dy=(wv-regs[i].y)*aspect, dd=dx*dx+dy*dy;
+        if(dd<b1){b2=b1;i2=i1;b1=dd;i1=i;} else if(dd<b2){b2=dd;i2=i;}
+      }
+      const d1=Math.sqrt(b1), d2=Math.sqrt(b2);
+      const k=(py*bw+px)*4; let c;
+      const coastR=seaR*(0.78+fbm(u*.07+7,v*.07+3)*0.5); // coastline wobble
+      if(i1<0||d1>coastR){
+        const depth=d1-coastR;
+        c=mix(seaA,seaB,Math.min(1,depth/16));
+        const ring=[1.6,4.2,8,13].some(r=>Math.abs(depth-r)<0.16);
+        if(ring) c=mix(c,contour,0.75);
+        if(depth<0.45) c=mix(c,coast,0.55);
+        if(hash2(px,py)<.012) c=mix(c,contour,.5);
+      } else {
+        const ci=cls[i1]; c=tint[i1];
+        // elevation + hillshade (light from the north-west)
+        const relief=ci==="mtn"?2.4:ci==="hill"?1.4:ci==="marsh"?.3:.8;
+        const e=fbm(u*.075,v*.075), e2=fbm((u+1.2)*.075,(v+1.2)*.075);
+        let shade=1+(e-e2)*relief*2.6+(e-.5)*.18;
+        shade*=1-Math.max(0,(d1/coastR)-.75)*.5;
+        c=[c[0]*shade,c[1]*shade,c[2]*shade];
+        const h=hash2(px*3+1,py*7+2);
+        if(ci==="forest"&&h<.07&&e>.42) c=mix(c,dark,.4);
+        if(ci==="forest"&&h>.97) c=mix(c,[90,120,80],.4);
+        if(ci==="marsh"&&py%5===0&&((px+(py*7))%9<5)&&h<.6) c=mix(c,[110,150,150],.35);
+        if(ci==="arid"&&h<.05) c=mix(c,[200,180,130],.3);
+        if(ci==="mtn"&&e>.58) c=mix(c,snow,Math.min(.7,(e-.58)*3.5));
+        if(d1>coastR-0.5) c=mix(c,coast,.35);
+        const r=regs[i1];
+        if(r.contested && ((px+py)%9<2)) c=mix(c,red,0.5);
+        if(i2>=0 && d2<=coastR){
+          const gap=(d2-d1)*ppu; // in px
+          const other=regs[i2];
+          if(atWar(state,r.owner,other.owner)){ if(gap<3.2) c=gap<1.4?red:mix(c,red,.55); }
+          else if(other.owner!==r.owner){ if(gap<2.2) c=mix(c,dark,.85); }
+          else if(gap<1) c=mix(c,dark,.35);
+        }
+      }
+      d[k]=c[0];d[k+1]=c[1];d[k+2]=c[2];d[k+3]=255;
+    }
+  }
+  octx.putImageData(img,0,0);
+  return off;
+}
+/* ===================== REAL-WORLD GEOGRAPHY ===================== */
+/* Country outlines come from the ECharts world map (Natural Earth data, Apache-2.0),
+   loaded as a script from a public CDN and decoded here. */
+const GEO={status:"idle",feats:[],byName:new Map(),W:2048,H:0,promise:null};
+const GEO_SRC=["https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/js/world.js","https://unpkg.com/echarts@4.9.0/map/js/world.js"];
+const LAT_N=83.5, LAT_S=-56;
+const GK=GEO.W/(2*Math.PI);
+function millerY(lat){const r=lat*Math.PI/180;return 1.25*Math.log(Math.tan(Math.PI/4+0.4*r));}
+const GY_N=millerY(LAT_N), GY_S=millerY(LAT_S);
+GEO.H=Math.round(GK*(GY_N-GY_S));
+function proj(lon,lat){lat=Math.max(LAT_S,Math.min(LAT_N,lat));return[(lon+180)/360*GEO.W, GK*(GY_N-millerY(lat))];}
+function decodeRing(str,off,scale){
+  const out=[];let px=off[0],py=off[1];
+  for(let i=0;i+1<str.length;i+=2){
+    let x=str.charCodeAt(i)-64,y=str.charCodeAt(i+1)-64;
+    x=(x>>1)^(-(x&1));y=(y>>1)^(-(y&1));
+    x+=px;y+=py;px=x;py=y;out.push([x/scale,y/scale]);
+  }
+  return out;
+}
+const normName=n=>String(n||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[.,'’()]/g,"").replace(/\s+/g," ").replace(/^the /,"").trim();
+const COUNTRY_ALIAS={"united states of america":"united states","usa":"united states","us":"united states","america":"united states","uk":"united kingdom","great britain":"united kingdom","britain":"united kingdom","england":"united kingdom","scotland":"united kingdom","wales":"united kingdom","soviet union":"russia","ussr":"russia","russian federation":"russia","czech republic":"czech rep","czechia":"czech rep","czechoslovakia":"czech rep","south korea":"korea","republic of korea":"korea","north korea":"dem rep korea","bosnia":"bosnia and herz","bosnia and herzegovina":"bosnia and herz","dominican republic":"dominican rep","democratic republic of the congo":"dem rep congo","dr congo":"dem rep congo","belgian congo":"dem rep congo","republic of the congo":"congo","ivory coast":"cote divoire","burma":"myanmar","persia":"iran","siam":"thailand","ceylon":"sri lanka","formosa":"taiwan","east germany":"germany","west germany":"germany","prussia":"germany","yugoslavia":"serbia","central african republic":"central african rep","south sudan":"s sudan","western sahara":"w sahara","equatorial guinea":"eq guinea","solomon islands":"solomon is","falkland islands":"falkland is","north macedonia":"macedonia","laos":"lao pdr","eswatini":"swaziland","rhodesia":"zimbabwe","abyssinia":"ethiopia","manchukuo":"china","manchuria":"china","indochina":"vietnam","french indochina":"vietnam","dutch east indies":"indonesia","netherlands east indies":"indonesia","holland":"netherlands","palestine":"israel","mandatory palestine":"israel","transjordan":"jordan","mesopotamia":"iraq","korea (north)":"dem rep korea","korea (south)":"korea","timor-leste":"timor-leste","east timor":"timor-leste","cape verde":"cape verde","turkiye":"turkey","viet nam":"vietnam"};
+function findCountry(n){
+  let k=normName(n); if(!k) return -1;
+  if(GEO.byName.has(k)) return GEO.byName.get(k);
+  if(COUNTRY_ALIAS[k]&&GEO.byName.has(COUNTRY_ALIAS[k])) return GEO.byName.get(COUNTRY_ALIAS[k]);
+  for(const [nm,i] of GEO.byName) if(nm.startsWith(k)||k.startsWith(nm)) return i;
+  return -1;
+}
+function buildGeo(raw){
+  const scale=raw.UTF8Scale||1024;
+  (raw.features||[]).forEach(f=>{
+    const name=f.properties&&f.properties.name; const g=f.geometry; if(!g||!name) return;
+    if(/antarctica/i.test(name)) return;
+    const polys=g.type==="Polygon"?[g.coordinates]:g.type==="MultiPolygon"?g.coordinates:[];
+    const offs=g.type==="Polygon"?[g.encodeOffsets||[]]:(g.encodeOffsets||[]);
+    const path=new Path2D(); let best=null,bestA=-1; let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+    polys.forEach((poly,pi)=>{
+      poly.forEach((ring,ri)=>{
+        const pts=typeof ring==="string"?decodeRing(ring,(offs[pi]||[])[ri]||[0,0],scale):ring;
+        if(pts.length<3) return;
+        let rx0=1e9,ry0=1e9,rx1=-1e9,ry1=-1e9;
+        pts.forEach(([lon,lat],k)=>{const[x,y]=proj(lon,lat);if(k)path.lineTo(x,y);else path.moveTo(x,y);
+          rx0=Math.min(rx0,x);rx1=Math.max(rx1,x);ry0=Math.min(ry0,y);ry1=Math.max(ry1,y);});
+        path.closePath();
+        const a=(rx1-rx0)*(ry1-ry0);
+        if(ri===0&&a>bestA){bestA=a;best=[(rx0+rx1)/2,(ry0+ry1)/2,rx1-rx0,ry1-ry0];}
+        minx=Math.min(minx,rx0);maxx=Math.max(maxx,rx1);miny=Math.min(miny,ry0);maxy=Math.max(maxy,ry1);
+      });
+    });
+    if(!best) return;
+    GEO.byName.set(normName(name),GEO.feats.length);
+    GEO.feats.push({name,path,lp:best,bbox:[minx,miny,maxx,maxy]});
+  });
+  if(GEO.feats.length<50) throw new Error("map data incomplete");
+}
+function loadGeo(){
+  if(GEO.promise) return GEO.promise;
+  GEO.status="loading";
+  GEO.promise=(async()=>{
+    let raw=null;
+    for(const src of GEO_SRC){
+      raw=await new Promise(res=>{
+        let got=null; const prev=window.echarts;
+        window.echarts={registerMap:(n,g)=>{got=g;}};
+        const s=document.createElement("script"); s.src=src; s.async=true;
+        const done=()=>{window.echarts=prev;res(got);};
+        s.onload=done; s.onerror=done; setTimeout(done,25000);
+        document.head.appendChild(s);
+      });
+      if(raw) break;
+    }
+    try{ if(!raw) throw 0; buildGeo(raw); GEO.status="ready"; }catch(e){ GEO.status="failed"; }
+    return GEO.status;
+  })();
+  return GEO.promise;
+}
+function geoActive(){return !!(S&&S.geo&&GEO.status==="ready"&&S.regions.some(r=>isFinite(r.lat)&&isFinite(r.lon)));}
+
+/* region positions on the real map; the map's seam sits in the widest empty stretch of longitude */
+const G={rx:[],ry:[],seamX:0,cRegions:new Map(),free:[],sig:""};
+function prepGeoRegions(){
+  const regs=S.regions;
+  const lons=regs.filter(r=>isFinite(r.lon)).map(r=>((+r.lon+540)%360)-180).sort((a,b)=>a-b);
+  let seam=180;
+  if(lons.length>1){let gap=-1,antiGap=0;
+    for(let i=0;i<lons.length;i++){const a=lons[i],b=i+1<lons.length?lons[i+1]:lons[0]+360;
+      if(b-a>gap){gap=b-a;seam=a+(b-a)/2;}
+      if(a<=180&&b>=180) antiGap=b-a;}
+    if(antiGap>=gap*0.8) seam=180;}
+  seam=((seam+540)%360)-180;
+  G.seamX=proj(seam,0)[0];
+  G.rx=[];G.ry=[];G.cRegions=new Map();G.free=[];
+  regs.forEach((r,i)=>{
+    if(!isFinite(r.lat)||!isFinite(r.lon)){G.rx[i]=NaN;G.ry[i]=NaN;return;}
+    let[x,y]=proj(((+r.lon+540)%360)-180,+r.lat); if(x<G.seamX) x+=GEO.W;
+    G.rx[i]=x;G.ry[i]=y;
+    const cs=(Array.isArray(r.countries)?r.countries:[]).map(findCountry).filter(k=>k>=0);
+    cs.forEach(k=>{if(!G.cRegions.has(k))G.cRegions.set(k,[]);G.cRegions.get(k).push(i);});
+    if(!cs.length&&!r.sea) G.free.push(i);
+  });
+}
+
+/* ---------- shared view state ---------- */
+const PW=1120, PH=694; // generated (fictional) map size
+const M={world:null,sig:"",z:1,ox:0,oy:0,W:0,H:0,fit:1,sel:null,tall:false,anim:0,stateId:null,mode:"gen",ov:null,ovT:0};
+function worldSig(){return JSON.stringify([S.regions.map(r=>[r.id,r.x,r.y,r.owner,r.contested,r.terrain,r.lat,r.lon,(r.countries||[]).join("|")]),S.factions.map(f=>[f.id,f.stance,f.color]),S.geo]);}
+const WW=()=>M.mode==="geo"?GEO.W:PW, WH=()=>M.mode==="geo"?GEO.H:PH;
+function mapUpdate(){
+  if(!S) return;
+  const mode=geoActive()?"geo":"gen";
+  const fresh=M.stateId!==S.id||M.mode!==mode;
+  M.mode=mode;
+  const sig=worldSig();
+  if(sig!==M.sig){
+    M.sig=sig;
+    if(mode==="geo"){prepGeoRegions();M.world=null;} else M.world=buildWorld(S,PW,PH);
+    M.ov=null;
+  }
+  if(fresh){M.stateId=S.id;M.sel=null;$("#regionCard").hidden=true;M.needFit=true;}
+  mapResize();
+  if(M.sel){const r=S.regions.find(r=>r.id===M.sel);if(r)showCard(r);else{M.sel=null;$("#regionCard").hidden=true;}}
+  renderLegendExtras();
+  startPulse();
+}
+function mapResize(){
+  const cv=$("#map"); const W=cv.parentElement.clientWidth; if(!W) return;
+  const narrow=W<420;
+  let H=Math.round(W*(M.tall?(narrow?1.15:.8):(narrow?.85:.66)));
+  if(isNarrow()) H=Math.max(H,Math.min(Math.round(W*1.6),window.innerHeight-(M.tall?250:330)));
+  const dpr=Math.min(2,devicePixelRatio||1);
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);cv.style.height=H+"px";
+  M.W=W;M.H=H;M.dpr=dpr;M.fit=W/WW();
+  if(M.needFit){fitTheater();M.needFit=false;}
+  clampView();M.ov=null;M.base=null;drawMap();scheduleOverlay();
+}
+function maxZ(){return M.mode==="geo"?40:5;}
+function minZ(){return M.mode==="geo"?1:Math.max(1,M.H/(WH()*M.fit));}
+function clampView(){
+  M.z=Math.max(minZ(),Math.min(maxZ(),M.z));
+  const s=M.fit*M.z;
+  if(M.mode==="geo"){
+    const x0=G.seamX, x1=G.seamX+GEO.W;
+    M.ox=Math.min(-x0*s,Math.max(M.W-x1*s,M.ox));
+  } else M.ox=Math.min(0,Math.max(M.W-PW*s,M.ox));
+  if(WH()*s<=M.H) M.oy=(M.H-WH()*s)/2;
+  else M.oy=Math.min(0,Math.max(M.H-WH()*s,M.oy));
+}
+/* opening view: frame the regions in play */
+function fitTheater(){
+  if(M.mode!=="geo"){M.z=1;M.ox=0;M.oy=0;return;}
+  const xs=G.rx.filter(isFinite), ys=G.ry.filter(isFinite);
+  if(!xs.length){M.z=1;M.ox=-G.seamX*M.fit;M.oy=0;return;}
+  let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const padX=Math.max(60,(x1-x0)*.18), padY=Math.max(50,(y1-y0)*.22);
+  x0-=padX;x1+=padX;y0-=padY;y1+=padY;
+  M.z=Math.max(1,Math.min(maxZ(),Math.min(M.W/((x1-x0)*M.fit),M.H/((y1-y0)*M.fit))));
+  const s=M.fit*M.z;
+  M.ox=M.W/2-((x0+x1)/2)*s; M.oy=M.H/2-((y0+y1)/2)*s;
+}
+function regionXY(r,i){
+  if(M.mode==="geo"){const k=i??S.regions.indexOf(r);return[G.rx[k],G.ry[k]];}
+  return[r.x/100*PW,r.y/100*PH];
+}
+function toScreen(x,y){const s=M.fit*M.z;return[x*s+M.ox,y*s+M.oy];}
+function regionScreen(r,i){const[x,y]=regionXY(r,i);return toScreen(x,y);}
+function zoomAt(px,py,nz){
+  const s=M.fit*M.z; const wx=(px-M.ox)/s, wy=(py-M.oy)/s;
+  M.z=Math.max(minZ(),Math.min(maxZ(),nz));
+  const s2=M.fit*M.z; M.ox=px-wx*s2; M.oy=py-wy*s2;
+  clampView();requestDraw();scheduleOverlay();
+}
+let drawReq=0;function requestDraw(){if(!drawReq)drawReq=requestAnimationFrame(()=>{drawReq=0;drawMap();});}
+const EV_COL={battle:"#ff6a52",strike:"#ff6a52",capture:"#e8b552",unrest:"#e6d25a",diplomacy:"#7db4f0"};
+
+/* ---------- territory overlay for the real map (recomputed when the view settles) ---------- */
+function scheduleOverlay(){ if(M.mode!=="geo") return; clearTimeout(M.ovT); M.ovT=setTimeout(computeOverlay,140); }
+function computeOverlay(){
+  if(M.mode!=="geo"||!M.W) return;
+  const k=Math.min(1.5,M.dpr||1), ow=Math.ceil(M.W*k), oh=Math.ceil(M.H*k), s=M.fit*M.z, W=GEO.W;
+  const idc=document.createElement("canvas");idc.width=ow;idc.height=oh;
+  const ic=idc.getContext("2d",{willReadFrequently:true});
+  for(const off of [-W,0,W]){
+    const left=(G.seamX+off)*s+M.ox; if(left>M.W||left+W*s<0) continue;
+    ic.setTransform(k*s,0,0,k*s,k*(M.ox+off*s),k*M.oy);
+    GEO.feats.forEach((f,i)=>{const id=i+1;ic.fillStyle=`rgb(${id&255},${id>>8},255)`;ic.fill(f.path);});
+  }
+  const src=ic.getImageData(0,0,ow,oh).data;
+  const cell=new Int16Array(ow*oh).fill(-1);
+  const regs=S.regions; const R=Math.max(120,GEO.W*0.06);
+  for(let py=0;py<oh;py++){
+    let lastId=-1;
+    const wy=(py/k-M.oy)/s;
+    for(let px=0;px<ow;px++){
+      const p=(py*ow+px)*4, a=src[p+3];
+      let id=-1;
+      if(a>=250&&src[p+2]>=250) id=(src[p]|(src[p+1]<<8))-1;
+      else if(a>0) id=lastId;
+      lastId=id;
+      if(id<0) continue;
+      const wx=(px/k-M.ox)/s;
+      let cands=G.cRegions.get(id), lim=Infinity;
+      if(!cands){cands=G.free;lim=R*R;}
+      let best=-1,bd=lim;
+      for(let c=0;c<cands.length;c++){const j=cands[c];let dx=wx-G.rx[j];dx-=W*Math.round(dx/W);const dy=wy-G.ry[j];const dd=dx*dx+dy*dy;if(dd<bd){bd=dd;best=j;}}
+      cell[py*ow+px]=best;
+    }
+  }
+  const out=new ImageData(ow,oh), d=out.data;
+  const rgb=regs.map(r=>hexToRgb(ownerColorIn(S,r.owner)));
+  const neutral=regs.map(r=>r.owner==null);
+  const red=[224,82,62];
+  for(let py=0;py<oh;py++){
+    for(let px=0;px<ow;px++){
+      const i=py*ow+px, c=cell[i]; if(c<0) continue;
+      const q=i*4; let col=rgb[c], al=neutral[c]?60:118;
+      if(regs[c].contested&&((px+py)%9<2)){col=red;al=170;}
+      const l=px>0?cell[i-1]:-1, u=py>0?cell[i-ow]:-1, l2=px>1?cell[i-2]:-1, u2=py>1?cell[i-2*ow]:-1;
+      const edge=(n)=>n>=0&&n!==c;
+      if(edge(l)||edge(u)||edge(l2)||edge(u2)){
+        const n=edge(l)?l:edge(u)?u:edge(l2)?l2:u2;
+        const oa=regs[c].owner, ob=regs[n].owner;
+        if(atWar(S,oa,ob)){col=red;al=255;}
+        else if(oa!==ob&&(edge(l)||edge(u))){col=[10,15,16];al=200;}
+        else if(edge(l)||edge(u)){col=[10,15,16];al=60;}
+      }
+      d[q]=col[0];d[q+1]=col[1];d[q+2]=col[2];d[q+3]=al;
+    }
+  }
+  const oc=document.createElement("canvas");oc.width=ow;oc.height=oh;oc.getContext("2d").putImageData(out,0,0);
+  M.ov={c:oc,ox:M.ox,oy:M.oy,s,k};
+  // cache the land layer for this exact view so redraws and animation stay cheap
+  const bc=document.createElement("canvas");bc.width=Math.round(M.W*M.dpr);bc.height=Math.round(M.H*M.dpr);
+  drawGeoBase(bc.getContext("2d"),M.dpr,s,M.ox,M.oy,M.W,M.H);
+  M.base={c:bc,ox:M.ox,oy:M.oy,s};
+  requestDraw();
+}
+
+/* ---------- drawing ---------- */
+const LAND="#2b3530", LAND_EDGE="rgba(150,170,160,.35)", OCEAN="#0b1a22", OCEAN2="#07131a";
+function drawGeoBase(ctx,dpr,s,ox,oy,W,H){
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,OCEAN);g.addColorStop(1,OCEAN2);
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // graticule every 15 degrees
+  ctx.strokeStyle="rgba(140,180,200,.07)";ctx.lineWidth=1;
+  for(let lon=-180;lon<=180;lon+=15){for(const off of [-GEO.W,0,GEO.W]){const x=(proj(lon,0)[0]+off)*s+ox;if(x<0||x>W)continue;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}}
+  for(let lat=-45;lat<=75;lat+=15){const y=proj(0,lat)[1]*s+oy;if(y<0||y>H)continue;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  for(const off of [-GEO.W,0,GEO.W]){
+    const left=(G.seamX+off)*s+ox; if(left>W||left+GEO.W*s<0) continue;
+    ctx.setTransform(dpr*s,0,0,dpr*s,dpr*(ox+off*s),dpr*oy);
+    ctx.fillStyle=LAND; GEO.feats.forEach(f=>ctx.fill(f.path));
+    ctx.strokeStyle=LAND_EDGE; ctx.lineWidth=0.9/s; ctx.lineJoin="round";
+    GEO.feats.forEach(f=>ctx.stroke(f.path));
+  }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+function drawCountryLabels(ctx,s,ox,oy,W,H,placed){
+  ctx.font='500 10px "IBM Plex Mono", ui-monospace, monospace';ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillStyle="rgba(200,212,205,.38)";
+  GEO.feats.forEach(f=>{
+    const[cx,cy,bw,bh]=f.lp; if(bw*s<70||bh*s<18) return;
+    for(const off of [-GEO.W,0,GEO.W]){
+      const x=(cx+off)*s+ox,y=cy*s+oy; if(x<0||x>W||y<0||y>H) continue;
+      const label=f.name.toUpperCase(); const tw=ctx.measureText(label).width;
+      const box=[x-tw/2-2,y-7,x+tw/2+2,y+7]; if(placed.some(b=>!(box[2]<b[0]||box[0]>b[2]||box[3]<b[1]||box[1]>b[3]))) continue;
+      placed.push(box); ctx.fillText(label,x,y);
+    }
+  });
+}
+function drawMoves(ctx){
+  (S.moves||[]).forEach(mv=>{
+    const a=S.regions.findIndex(r=>r.id===mv.from), b=S.regions.findIndex(r=>r.id===mv.to); if(a<0||b<0||a===b) return;
+    let[x1,y1]=regionXY(S.regions[a],a),[x2,y2]=regionXY(S.regions[b],b); if(!isFinite(x1)||!isFinite(x2)) return;
+    if(M.mode==="geo"){let dx=x2-x1;dx-=GEO.W*Math.round(dx/GEO.W);x2=x1+dx;}
+    [x1,y1]=toScreen(x1,y1);[x2,y2]=toScreen(x2,y2);
+    const len=Math.hypot(x2-x1,y2-y1); if(len<14) return;
+    const nx=-(y2-y1)/len, ny=(x2-x1)/len, bend=Math.min(60,len*.18);
+    const cx=(x1+x2)/2+nx*bend, cy=(y1+y2)/2+ny*bend;
+    const ux=(x2-cx), uy=(y2-cy), ul=Math.hypot(ux,uy)||1;
+    const ex=x2-ux/ul*9, ey=y2-uy/ul*9; // stop short of the marker
+    const col=ownerColorIn(S,mv.faction||S.regions[a].owner);
+    const dash=mv.kind==="naval"?[7,5]:mv.kind==="air"?[2,5]:mv.kind==="retreat"?[10,4,2,4]:[];
+    ctx.lineCap="round";
+    ctx.setLineDash(dash);
+    ctx.strokeStyle="rgba(5,8,9,.85)";ctx.lineWidth=5.5;ctx.beginPath();ctx.moveTo(x1,y1);ctx.quadraticCurveTo(cx,cy,ex,ey);ctx.stroke();
+    ctx.strokeStyle=col;ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(x1,y1);ctx.quadraticCurveTo(cx,cy,ex,ey);ctx.stroke();
+    ctx.setLineDash([]);
+    const ang=Math.atan2(uy,ux);
+    ctx.fillStyle=col;ctx.strokeStyle="rgba(5,8,9,.85)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(ex+Math.cos(ang)*6,ey+Math.sin(ang)*6);
+    ctx.lineTo(ex+Math.cos(ang+2.5)*9,ey+Math.sin(ang+2.5)*9);ctx.lineTo(ex+Math.cos(ang-2.5)*9,ey+Math.sin(ang-2.5)*9);ctx.closePath();ctx.fill();ctx.stroke();
+  });
+}
+function drawMarkersAndLabels(ctx,t,placed){
+  const now=(t||performance.now())/1000;
+  (S.events||[]).forEach((e,ix)=>{
+    const i=S.regions.findIndex(r=>r.id===e.region); if(i<0) return;
+    const[x,y]=regionScreen(S.regions[i],i); if(!isFinite(x)) return; const col=EV_COL[e.kind]||"#e8b552";
+    const ph=reduceMotion?0.4:((now*0.6+ix*0.3)%1);
+    ctx.strokeStyle=col;ctx.lineWidth=2;
+    ctx.globalAlpha=1-ph;ctx.beginPath();ctx.arc(x,y,11+ph*22,0,Math.PI*2);ctx.stroke();
+    ctx.globalAlpha=1;ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.stroke();
+  });
+  const big=M.mode==="geo"?false:M.z>=1.8;
+  const order=S.regions.map((r,i)=>i).sort((a,b)=>(S.regions[b].id===M.sel)-(S.regions[a].id===M.sel)||(isCity(S.regions[b].terrain)-isCity(S.regions[a].terrain)));
+  const fs=M.W<420?10:11;
+  order.forEach(i=>{
+    const r=S.regions[i]; const[x,y]=regionScreen(r,i); if(!isFinite(x)||x<-60||x>M.W+60||y<-30||y>M.H+30) return;
+    const sel=r.id===M.sel, col=ownerColorIn(S,r.owner);
+    // marker: owner-colored, square for cities, diamond for sea areas
+    ctx.fillStyle=col;ctx.strokeStyle="#081012";ctx.lineWidth=2;
+    ctx.beginPath();
+    if(r.sea){ctx.moveTo(x,y-6);ctx.lineTo(x+6,y);ctx.lineTo(x,y+6);ctx.lineTo(x-6,y);ctx.closePath();}
+    else if(isCity(r.terrain)) ctx.rect(x-4.5,y-4.5,9,9); else ctx.arc(x,y,4.8,0,Math.PI*2);
+    ctx.fill();ctx.stroke();
+    ctx.fillStyle="rgba(240,242,235,.95)";ctx.beginPath();ctx.arc(x,y,1.6,0,Math.PI*2);ctx.fill();
+    if(sel){ctx.strokeStyle="#d6a447";ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,15,0,Math.PI*2);ctx.stroke();}
+    ctx.font=`${sel?600:500} ${fs}px "IBM Plex Mono", ui-monospace, monospace`;
+    const tw=ctx.measureText(r.name).width;
+    const box=[x-tw/2-3,y+6,x+tw/2+3,y+8+fs];
+    if(!sel&&placed.some(b=>!(box[2]<b[0]||box[0]>b[2]||box[3]<b[1]||box[1]>b[3]))) return;
+    placed.push(box);
+    ctx.textAlign="center";ctx.textBaseline="top";ctx.lineJoin="round";ctx.lineWidth=3.5;ctx.strokeStyle="rgba(6,10,11,.92)";ctx.strokeText(r.name,x,y+7);
+    ctx.fillStyle=sel?"#f1c46a":r.contested?"#f6b9ab":"#eceee4";ctx.fillText(r.name,x,y+7);
+    if(big&&r.terrain){ctx.font='400 10px "IBM Plex Mono", ui-monospace, monospace';
+      ctx.lineWidth=3;ctx.strokeText(r.terrain,x,y+8+fs+2);ctx.fillStyle="rgba(223,225,214,.7)";ctx.fillText(r.terrain,x,y+8+fs+2);}
+  });
+}
+function drawMap(t){
+  const cv=$("#map"); if(!cv.width||!S) return;
+  const ctx=cv.getContext("2d"),dpr=M.dpr,s=M.fit*M.z;
+  const placed=[];
+  if(M.mode==="geo"){
+    const b=M.base;
+    if(b&&b.s===s&&b.ox===M.ox&&b.oy===M.oy){ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(b.c,0,0);ctx.setTransform(dpr,0,0,dpr,0,0);}
+    else if(b){ // view is moving: stretch the last sharp frame, redraw sharp when it settles
+      const r=s/b.s; ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=OCEAN;ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.setTransform(r,0,0,r,dpr*(M.ox-b.ox*r),dpr*(M.oy-b.oy*r));ctx.drawImage(b.c,0,0);ctx.setTransform(dpr,0,0,dpr,0,0);}
+    else drawGeoBase(ctx,dpr,s,M.ox,M.oy,M.W,M.H);
+    if(M.ov){const o=M.ov, r=s/o.s;
+      ctx.setTransform(dpr*r/o.k,0,0,dpr*r/o.k,dpr*(M.ox-o.ox*r),dpr*(M.oy-o.oy*r));
+      ctx.imageSmoothingEnabled=true;ctx.drawImage(o.c,0,0);ctx.setTransform(dpr,0,0,dpr,0,0);}
+    drawCountryLabels(ctx,s,M.ox,M.oy,M.W,M.H,placed.slice());
+  } else {
+    if(!M.world) return;
+    ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#081419";ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.setTransform(dpr*s,0,0,dpr*s,dpr*M.ox,dpr*M.oy);
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.drawImage(M.world,0,0);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.strokeStyle="rgba(223,225,214,0.07)";ctx.lineWidth=1;
+    ctx.font='500 10px "IBM Plex Mono", ui-monospace, monospace';ctx.fillStyle="rgba(223,225,214,0.45)";
+    for(let i=0;i<=10;i++){const[x]=toScreen(i*PW/10,0);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,M.H);ctx.stroke();
+      if(i<10){const[xm]=toScreen((i+.5)*PW/10,0);if(xm>8&&xm<M.W-8){ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText("ABCDEFGHIJ"[i],xm,4);}}}
+    for(let j=0;j<=6;j++){const[,y]=toScreen(0,j*PH/6);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(M.W,y);ctx.stroke();
+      if(j<6){const[,ym]=toScreen(0,(j+.5)*PH/6);if(ym>14&&ym<M.H-8){ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(String(j+1),5,ym);}}}
+  }
+  drawMoves(ctx);
+  drawMarkersAndLabels(ctx,t,placed);
+  // compass
+  const cx=M.W-26,cy=M.H-30;
+  ctx.strokeStyle="rgba(223,225,214,.6)";ctx.fillStyle="rgba(223,225,214,.75)";ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(cx,cy-14);ctx.lineTo(cx+5,cy);ctx.lineTo(cx,cy-3);ctx.lineTo(cx-5,cy);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(cx,cy+12);ctx.lineTo(cx,cy);ctx.stroke();
+  ctx.font='600 10px "IBM Plex Mono", monospace';ctx.textAlign="center";ctx.textBaseline="bottom";ctx.fillText("N",cx,cy-15);
+  $("#zoomLvl").textContent=M.z.toFixed(1)+"×";
+}
+const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function startPulse(){
+  cancelAnimationFrame(M.anim);
+  if(reduceMotion||!(S&&S.events&&S.events.length)) return;
+  let last=0;
+  const loop=t=>{ if($("#game").hidden||!S||!S.events.length) return;
+    if(t-last>50){last=t;drawMap(t);} M.anim=requestAnimationFrame(loop); };
+  M.anim=requestAnimationFrame(loop);
+}
+function regionAt(px,py){
+  let best=null,bd=M.mode==="geo"?44*44:1e12;
+  S.regions.forEach((r,i)=>{const[x,y]=regionScreen(r,i);if(!isFinite(x))return;const dd=(x-px)**2+(y-py)**2;if(dd<bd){bd=dd;best=r;}});
+  return best;
+}
+function renderLegendExtras(){
+  const lg=$("#legend"); if(!lg) return;
+  lg.querySelectorAll(".lx").forEach(n=>n.remove());
+  if((S.moves||[]).length) lg.insertAdjacentHTML("beforeend",`<span class="lx"><i style="background:none;border-top:2px solid var(--ink);width:14px;height:0;border-radius:0;vertical-align:3px"></i>Troop movement</span>`);
+  if(M.mode==="geo") lg.insertAdjacentHTML("beforeend",`<span class="lx"><i style="background:#e0523e;height:3px;vertical-align:3px"></i>Front line</span>`);
+}
+function showCard(r){
+  const f=S.factions.find(f=>f.id===r.owner);
+  const evs=(S.events||[]).filter(e=>e.region===r.id);
+  $("#rcName").textContent=r.name;
+  $("#rcOwner").innerHTML=`<span class="sw" style="background:${ownerColorIn(S,r.owner)}"></span>${esc(f?f.name:"Unclaimed")}${f?` <span class="pill ${esc(f.stance)}">${esc(stanceLabel(f.stance))}</span>`:""}`;
+  $("#rcInfo").textContent=[r.terrain,(r.countries&&r.countries.length&&M.mode==="geo")?r.countries.join(", "):"",r.contested?"Fighting here now":"",...evs.map(e=>e.text)].filter(Boolean).join(" · ");
+  $("#regionCard").hidden=false;
+}
+(function initMapControls(){
+  const cv=$("#map"); const ptrs=new Map(); let drag=null,pinch=null;
+  const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];};
+  cv.addEventListener("pointerdown",e=>{
+    cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,pos(e));
+    if(ptrs.size===1){const[x,y]=pos(e);drag={x,y,ox:M.ox,oy:M.oy,moved:0};pinch=null;}
+    else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinch={dist:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z:M.z};drag=null;}
+  });
+  cv.addEventListener("pointermove",e=>{
+    if(!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,pos(e));
+    if(pinch&&ptrs.size>=2){const[a,b]=[...ptrs.values()];const dist=Math.hypot(a[0]-b[0],a[1]-b[1]);
+      zoomAt((a[0]+b[0])/2,(a[1]+b[1])/2,pinch.z*dist/pinch.dist);}
+    else if(drag){const[x,y]=pos(e);const dx=x-drag.x,dy=y-drag.y;drag.moved=Math.max(drag.moved,Math.hypot(dx,dy));
+      M.ox=drag.ox+dx;M.oy=drag.oy+dy;clampView();requestDraw();cv.classList.toggle("grabbing",drag.moved>4);}
+  });
+  const end=e=>{
+    if(!ptrs.has(e.pointerId)) return;
+    if(drag&&ptrs.size===1&&drag.moved<6&&e.type==="pointerup"){
+      const[x,y]=pos(e);const r=regionAt(x,y);
+      if(r){M.sel=M.sel===r.id?null:r.id;if(M.sel)showCard(r);else $("#regionCard").hidden=true;requestDraw();}
+    }
+    ptrs.delete(e.pointerId); cv.classList.remove("grabbing");
+    if(ptrs.size===1){const[p]=[...ptrs.values()];drag={x:p[0],y:p[1],ox:M.ox,oy:M.oy,moved:99};pinch=null;}
+    else if(!ptrs.size){drag=null;pinch=null;scheduleOverlay();}
+  };
+  cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",end);
+  cv.addEventListener("wheel",e=>{e.preventDefault();const[x,y]=pos(e);zoomAt(x,y,M.z*Math.exp(-e.deltaY*0.0016));},{passive:false});
+  cv.addEventListener("dblclick",e=>{const[x,y]=pos(e);zoomAt(x,y,M.z*1.8);});
+  $("#zoomIn").onclick=()=>zoomAt(M.W/2,M.H/2,M.z*1.5);
+  $("#zoomOut").onclick=()=>zoomAt(M.W/2,M.H/2,M.z/1.5);
+  $("#zoomFit").onclick=()=>{fitTheater();clampView();requestDraw();scheduleOverlay();};
+  $("#mapTall").onclick=()=>{M.tall=!M.tall;$("#mapTall").textContent=M.tall?"Smaller":"Bigger";$("#mapTall").setAttribute("aria-pressed",String(M.tall));mapResize();};
+  $("#rcUse").onclick=()=>{const r=S.regions.find(r=>r.id===M.sel);if(r){setView("cmd");insertText(r.name);}};
+  $("#rcClose").onclick=()=>{M.sel=null;$("#regionCard").hidden=true;requestDraw();};
+})();
+function insertText(t){
+  const ta=$("#orderIn"); const v=ta.value;
+  const sep=v && !/\s$/.test(v)?" ":"";
+  ta.value=v+sep+t+" "; ta.focus(); autoGrow();
+}
+
+/* ---------- small previews on the scenario cards ---------- */
+function drawPreview(cv,state){
+  const W=cv.clientWidth||300,H=Math.round(W*.42),dpr=Math.min(2,devicePixelRatio||1);
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";
+  const ctx=cv.getContext("2d");
+  if(state.geo&&GEO.status==="ready"&&state.regions.some(r=>isFinite(r.lat))){
+    const pts=state.regions.filter(r=>isFinite(r.lat)).map(r=>proj(+r.lon,+r.lat));
+    let x0=Math.min(...pts.map(p=>p[0])),x1=Math.max(...pts.map(p=>p[0])),y0=Math.min(...pts.map(p=>p[1])),y1=Math.max(...pts.map(p=>p[1]));
+    const pad=Math.max(30,(x1-x0)*.2);x0-=pad;x1+=pad;y0-=pad*.6;y1+=pad*.6;
+    const s=Math.min(W/(x1-x0),H/(y1-y0)); const ox=W/2-(x0+x1)/2*s, oy=H/2-(y0+y1)/2*s;
+    const keepSeam=G.seamX; G.seamX=0;
+    drawGeoBase(ctx,dpr,s,ox,oy,W,H);
+    G.seamX=keepSeam;
+    state.regions.forEach(r=>{if(!isFinite(r.lat))return;const[x,y]=proj(+r.lon,+r.lat);
+      ctx.fillStyle=ownerColorIn(state,r.owner);ctx.strokeStyle="#081012";ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x*s+ox,y*s+oy,3.6,0,Math.PI*2);ctx.fill();ctx.stroke();});
+    return;
+  }
+  const w=buildWorld(state,260,161);
+  const sh=161*(W/260)>H?H/(W/260):161; const sy=(161-sh)/2;
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(w,0,sy,260,sh,0,0,cv.width,cv.height);
+}
+
+/* ---------- putting an older or newly built war on the real map ---------- */
+async function geocodeWorld(){
+  if(!S||S.geoChecked||!sample||GEO.status!=="ready"||M.geocoding) return;
+  M.geocoding=true; const st=$("#mapStatus"); st.textContent="Placing your regions on the real map…"; st.hidden=false;
+  const forId=S.id;
+  const prompt=`A war game has these map regions. Decide whether the war takes place on the real Earth (historical, present day or near future) or in a fictional/fantasy world.
+
+WAR: ${S.title}
+PREMISE: ${S.premise}
+REGIONS (id | name | terrain):
+${S.regions.map(r=>`${r.id} | ${r.name} | ${r.terrain||""}`).join("\n")}
+
+If it is fictional, reply {"real":false}.
+If it is the real Earth, reply with ONLY this JSON:
+{"real":true,"regions":[{"id":"region id","lat":0.0,"lon":0.0,"countries":["exact names from the list below"],"sea":false}]}
+- lat/lon: the region's center or main city, in decimal degrees (west and south are negative).
+- countries: every modern country the region covers, spelled exactly as in the list. A region that is part of a country (e.g. "Midwest") lists that country. Use [] for sea areas.
+- sea: true only for ocean or sea regions.
+
+COUNTRY NAMES:
+${GEO.feats.map(f=>f.name).join("; ")}`;
+  try{
+    const res=await sample.json(prompt,{cache:false,modelTier:"default"});
+    if(!S||S.id!==forId) return;
+    if(res&&res.real===true&&Array.isArray(res.regions)){
+      res.regions.forEach(g=>{const r=S.regions.find(x=>x.id===g.id);if(!r)return;
+        const lat=Number(g.lat),lon=Number(g.lon);if(!isFinite(lat)||!isFinite(lon))return;
+        r.lat=lat;r.lon=lon;r.countries=Array.isArray(g.countries)?g.countries.map(String).slice(0,12):[];r.sea=!!g.sea;});
+      S.geo=S.regions.some(r=>isFinite(r.lat));
+    } else S.geo=false;
+    S.geoChecked=true; saveGame(); mapUpdate();
+    st.hidden=true;
+  }catch(e){
+    st.textContent="Couldn't place the regions on the real map this time. It will try again next time you open this war.";
+    setTimeout(()=>{st.hidden=true;},6000);
+  }finally{M.geocoding=false;}
+}
+function ensureRealMap(){
+  if(!S) return;
+  loadGeo().then(st=>{ if(st!=="ready"||!S) return; mapUpdate(); if(!S.geoChecked) geocodeWorld(); });
+}
+
+/* ===================== RENDER GAME ===================== */
+function stanceLabel(s){return({player:"You",ally:"Ally",neutral:"Neutral",hostile:"Hostile",war:"At war"})[s]||s||"—";}
+function renderAll(){
+  if(!S) return;
+  S.factions.forEach(f=>factionColor(f.id));
+  $("#gTitle").textContent=S.title;
+  $("#gDate").textContent=S.date;
+  $("#gTurn").textContent=S.turn;
+  $("#gLossP").textContent=(S.casualties.player||0).toLocaleString();
+  $("#gLossE").textContent=(S.casualties.enemy||0).toLocaleString();
+  $("#undoBtn").disabled=busy||history.length===0; $("#undoBtn2").disabled=busy||history.length===0;
+  mapUpdate();
+  // legend
+  setTimeout(renderLegendExtras,0);
+  $("#legend").innerHTML=S.factions.map(f=>`<span><i style="background:${factionColor(f.id)}"></i>${esc(f.name)}</span>`).join("")+
+    `<span><i style="background:repeating-linear-gradient(45deg,#d0503c 0 2px,transparent 2px 5px);border:1px solid #6b3229"></i>Contested</span>`;
+  // factions
+  $("#facList").innerHTML=S.factions.map(f=>{
+    const held=S.regions.filter(r=>r.owner===f.id).length;
+    const st=["strength","economy","morale"].map(k=>`<div class="stat"><div class="k">${k==="strength"?"Military":k==="economy"?"Economy":"Morale"}<b>${f[k]}</b></div><div class="bar"><i style="width:${f[k]}%;background:${factionColor(f.id)}"></i></div></div>`).join("");
+    return `<div class="frow" data-f="${esc(f.id)}"><div class="fname"><span class="sw" style="background:${factionColor(f.id)}"></span><span class="n">${esc(f.name)}</span></div>
+      <span class="pill ${esc(f.stance)}">${esc(stanceLabel(f.stance))}</span>
+      <div class="stats">${st}</div>
+      <div class="fnote">${esc(f.leader?f.leader+" · ":"")}${held} region${held===1?"":"s"}${f.note?" · "+esc(f.note):""}</div></div>`;
+  }).join("");
+  const ag=(S.agreements||[]).slice(-6).reverse();
+  if(ag.length) $("#facList").insertAdjacentHTML("beforeend",`<div class="agreements"><div class="label">Agreements in force</div><ul>${ag.map(a=>`<li>${esc(a.text)} <small>· ${esc(a.with)}, ${esc(a.date)}</small></li>`).join("")}</ul></div>`);
+  // headlines
+  const H=(S.headlines||[]);
+  const lastTurn=H.length?H[0].turn:null;
+  $("#heads").innerHTML=H.length?`<div class="hd-label label">Headlines</div>`+H.slice(0,16).map(h=>`<div class="hd ${h.turn===lastTurn?"new":""} ${h._fresh?"fresh":""}"><div class="hd-out">${esc(h.outlet)}<span>${esc(h.date||"")}</span></div><div class="hd-t">${esc(h.text)}</div></div>`).join("")+`<div class="hd-label label">Posts</div>`:`<div class="hd-label label">Headlines</div><div class="empty">Headlines arrive with your next order.</div><div class="hd-label label">Posts</div>`;
+  H.forEach(h=>delete h._fresh);
+  const tk=H.filter(h=>h.turn===lastTurn).slice(0,8); if(!tk.length) tk.push(...H.slice(0,6));
+  $("#ticker").hidden=!tk.length;
+  const items=tk.map(h=>`<span class="tk-item"><b>${esc(h.outlet)}</b> ${esc(h.text)}</span>`).join("");
+  $("#tkTrack").innerHTML=items+items;
+  $("#tkTrack").style.animationDuration=Math.max(30,tk.reduce((n,h)=>n+h.text.length+h.outlet.length,0)*0.28)+"s";
+  // feed
+  const feed=S.feed.slice(0,40);
+  $("#feed").innerHTML=feed.length?feed.map((p,i)=>`<div class="post ${p._fresh?"fresh":""}"><div class="who"><span class="sw" style="background:${p.faction?factionColor(p.faction):"#56625d"};align-self:center"></span><b>${esc(p.author)}</b><span>@${esc(String(p.handle||"").replace(/^@/,""))}</span></div><div class="t">${esc(p.text)}</div><div class="when">${esc(p.date||"")}</div></div>`).join(""):`<div class="empty">Nobody is talking yet.</div>`;
+  S.feed.forEach(p=>delete p._fresh);
+  // characters
+  $("#charList").innerHTML=S.characters.length?S.characters.map((c,i)=>`<div class="crow ${c.status==="dead"?"dead":""}" data-i="${i}"><div class="cleft"><div class="cn"><span class="sw" style="display:inline-block;margin-right:6px;background:${factionColor(c.faction)}"></span>${esc(c.name)}</div><div class="cr">${esc(c.role||"")}</div></div><div class="cside"><div class="cm">${esc(c.status&&c.status!=="active"?c.status:(c.mood||""))}</div><button type="button" class="talk" data-talk="${i}">Talk</button></div></div>`).join(""):`<div class="empty">No key figures yet.</div>`;
+  renderTalkTargets();
+  renderChips();
+  renderLog();
+  renderInboxBadge();
+  if(!$("#inbox").hidden) renderInbox();
+}
+function renderChips(){
+  if(mode==="talk"){
+    $("#chips").innerHTML=["What's your read on the situation?","What do you advise?","What would it take to get your help?"].map(s=>`<button type="button" class="chip" data-say="${esc(s)}">${esc(s)}</button>`).join("");
+    return;
+  }
+  const sug=(S.suggestions||[]).slice(0,4);
+  $("#chips").innerHTML=sug.map(s=>`<button type="button" class="chip" data-s="${esc(s)}">${esc(s)}</button>`).join("")+
+    `<button type="button" class="chip time" data-s="__time">Let a week pass</button>`;
+}
+function entryHTML(e,i){
+  if(e.kind==="say") return `<div class="entry say"><div class="stamp">You → ${esc(e.to)} · no time passes</div><div class="txt">${esc(e.text)}</div></div>`;
+  if(e.kind==="reply") return `<div class="entry reply"><div class="who"><span class="sw" style="background:${factionColor(e.faction)}"></span>${esc(e.from)}${e.role?` <small>${esc(e.role)}</small>`:""}</div><div class="prose">${esc(e.text)}</div>${e.agreement?`<div class="deal"><b>AGREED</b> · ${esc(e.agreement)}</div>`:""}${e.stanceChange?`<div class="deal"><b>RELATIONS</b> · ${esc(e.stanceChange)}</div>`:""}${e.standing?`<div class="deal std"><b>REGULAR REPORT</b> · ${esc(e.standing)} — arrives in your inbox each turn</div>`:""}</div>`;
+  if(e.kind==="order") return `<div class="entry order"><div class="stamp">Your order · ${esc(e.date)}</div><div class="txt">${esc(e.text)}</div></div>`;
+  const evs=(e.events||[]).map(ev=>{const r=S.regions.find(r=>r.id===ev.region);return `<span class="ev ${esc(ev.kind)}"><b>${esc((ev.kind||"event").toUpperCase())}</b> ${esc(r?r.name+": ":"")}${esc(ev.text||"")}</span>`}).join("");
+  return `<div class="entry report" data-i="${i}"><div class="stamp">${e.turn===0?"Opening situation":"Report"} · ${esc(e.date)}</div>
+    ${e.headline?`<div class="headline">${esc(e.headline)}</div>`:""}
+    <div class="prose">${esc(e.text)}</div>
+    ${evs?`<div class="events">${evs}</div>`:""}
+    ${e.outcome?`<div class="outcome">${esc(e.outcome)}</div>`:""}</div>`;
+}
+function renderLog(){
+  const log=$("#log");
+  const keep=logScroller()?log.scrollTop:null;
+  log.innerHTML=S.log.map(entryHTML).join("");
+  if(stickBottom) scrollToLatest(true); else if(keep!=null) log.scrollTop=keep;
+}
+
+/* ===================== AI TURN ===================== */
+function compactState(){
+  const fac=S.factions.map(f=>`${f.id} | ${f.name} | leader: ${f.leader||"?"} | military ${f.strength}, economy ${f.economy}, morale ${f.morale} | stance to player: ${f.stance}${f.note?" | "+f.note:""}`).join("\n");
+  const reg=S.regions.map(r=>`${r.id} | ${r.name} | owner: ${r.owner||"none"} | ${r.terrain||""}${r.contested?" | CONTESTED":""}`).join("\n");
+  const ch=S.characters.map(c=>`${c.name} | ${c.role||""} | faction ${c.faction||"none"} | ${c.status&&c.status!=="active"?c.status:"mood: "+(c.mood||"")}`).join("\n");
+  const convo=S.log.filter(e=>e.kind==="say"||e.kind==="reply");
+  const keepConvo=new Set(convo.slice(-6));
+  const recent=S.log.slice(-14).filter(e=>(e.kind!=="say"&&e.kind!=="reply")||keepConvo.has(e)).map(e=>e.kind==="order"?`PLAYER ORDER (${e.date}): ${e.text}`
+    :e.kind==="say"?`PLAYER SAID TO ${e.to}: ${String(e.text).slice(0,300)}`
+    :e.kind==="reply"?`${e.from} REPLIED: ${String(e.text).slice(0,300)}${e.agreement?" [AGREED: "+e.agreement+"]":""}`
+    :`REPORT (${e.date}): ${String(e.text).slice(0,700)}`).join("\n\n");
+  const ag=(S.agreements||[]).slice(-8).map(a=>`- ${a.text} (with ${a.with}, ${a.date})`).join("\n")||"none";
+  return {fac,reg,ch,recent,ag};
+}
+function buildTurnPrompt(order){
+  const pf=S.factions.find(f=>f.id===S.player);
+  const c=compactState();
+  return `You are the game master of a text war simulation called "Theater of War". The player commands ${pf?pf.name:"a faction"} (faction id "${S.player}"). They type orders in their own words and you decide what actually happens.
+
+RULES
+- Be a fair, realistic game master. Orders can succeed, partly succeed, fail, cost lives, or backfire, depending on forces, terrain, supply, weather, morale, intelligence and surprise. The player never wins automatically. Reward clever plans, punish reckless ones.
+- Other factions act on their own every turn, pursuing their own goals. Show at least one move by another power.
+- Time passes in proportion to the order (hours for a raid, days for an offensive, weeks for a campaign). Advance the date accordingly and write it in the same style as the current date.
+- HISTORY AND THE OTHER POWERS. The player's own side is driven only by the player's choices; never push it onto the historical path. Every other power acts on its own every turn, pursuing its REAL goals, plans and leaders' personalities from history (if the war is set in real history), so when the player leaves them alone their actions unfold roughly as they really did and on about the real dates, including major events the player hasn't touched. These come from each power's own motives, not from a script: before each historical action, check that it still makes sense in the world as it now stands. If the player's choices have changed the circumstances, the power adapts the way its real leaders would: a small change nudges the event, a big change reshapes it (different target, different timing, different method), and if the event has become impossible or pointless (e.g. that power already surrendered) it simply does not happen. If this turn's time span passes the real date of a major event that still makes sense, it MUST happen and appear in the report, headlines or inbox; never skip it silently. Never reveal future events in advance. The player may only get the hints a real leader could get (intercepts, warnings, rumors, odd reports), and these can be vague, wrong or easy to dismiss.
+- The player may have held conversations since the last turn (shown in RECENT TURNS). Those took no time. Honor AGREEMENTS unless events give a party good reason to break them, and show their effects (troops arriving, aid delivered, betrayals).
+- If the order is impossible for this world (wrong era, wrong resources), describe what happens when they try.
+- Stats are 0-100; change them in proportion to events (usually 1-8 per turn, more for disasters). Regions change owner only when the fighting justifies it. Mark regions contested while fighting is ongoing.
+- War is grim: show cost and consequence without gratuitous gore.
+- Write the report in second person, present tense. 120-260 words. Concrete places, units, names. Plain paragraphs, no markdown, no headings, no bullet lists.
+
+OUTPUT FORMAT — exactly this:
+1) The report prose.
+2) A line containing only @@STATE@@
+3) One JSON object, no code fence:
+{"date":"new in-world date/time","headline":"4-7 word headline","chronicle":"the whole story so far in under 120 words, updated with this turn","factions":[{"id":"...","strength":0,"economy":0,"morale":0,"stance":"player|ally|neutral|hostile|war","note":"short current situation"}],"regions":[{"id":"...","owner":"faction id or null","contested":false}],"newRegions":[{"id":"...","name":"...","x":0,"y":0,"lat":0,"lon":0,"countries":[],"owner":"...","terrain":"..."}],"moves":[{"from":"region id","to":"region id","faction":"faction id","kind":"advance|retreat|naval|air|supply"}],"events":[{"region":"region id","kind":"battle|capture|strike|unrest|diplomacy","text":"under 10 words"}],"characters":[{"name":"exact name","role":"...","faction":"id","mood":"2-5 words","status":"active|wounded|captured|dead"}],"casualties":{"player":0,"enemy":0},"headlines":[{"outlet":"in-world newspaper, radio or agency","text":"headline under 12 words"}],"feed":[{"author":"name","handle":"short_handle","faction":"faction id or empty","text":"under 40 words"}],"inbox":[{"from":"sender's exact name","role":"...","faction":"faction id","kind":"report|letter|cable|demand|offer|intel|alert","subject":"under 10 words","body":"the message itself"}],"standing":[],"suggestions":["three short next orders, under 8 words each"],"outcome":null}
+- factions and regions: include ONLY ones that changed. characters: include only changed or newly introduced people (new people may be added). newRegions only if a new place matters (x,y on a 0-100 map, x east, y south${S.geo?"; ALSO give real lat/lon and the modern countries it covers":""}), usually empty.
+- moves: the main troop, fleet or air movements this turn (0-6), from one region id to another, so they can be drawn as arrows on the map.
+- casualties: approximate NEW losses this turn (people), integers.
+- headlines: 5-7 news headlines about this turn and the wider world, each from a DIFFERENT in-world outlet that fits the era and setting. Mix the kinds of outlet: major national papers, wire services, radio or TV, local and regional papers, tabloids, financial and trade press, military and veterans' papers, religious or opinion weeklies, and foreign, neutral and enemy press (which may spin, censor or lie). Use real outlets of the period where they existed. Rotate: avoid outlets listed under RECENT OUTLETS unless the story is truly theirs, and bring in new ones regularly. Not every headline needs to be about the front: politics, home front, economy, rumors, human interest.
+- inbox: messages that reach the player this turn. Deliver ONE message for EACH item in REGULAR REPORTS (kind "report", from that person, covering this period with concrete numbers, names and problems). Then add 0-2 other messages only when the world would produce them: letters, cables or telegrams from foreign leaders (offers, threats, demands, answers to earlier contact or letters the player sent), urgent intel, pleas from allies, trouble from the player's own officials. Each body is the message itself, 40-150 words, in the sender's voice, signed. Use names from KEY FIGURES where they fit; new senders are allowed. Don't repeat the report.
+- standing: usually []. If the player's order sets up a recurring report, add {"who":"person's name","what":"short description"}.
+- feed: 2-4 posts from people inside the world reacting to this turn: soldiers, reporters, civilians, leaders, propaganda. Varied voices.
+- outcome: null, or a short phrase like "Decisive victory" or "Total defeat" only if the war has truly ended.
+
+WORLD: ${S.title}
+PREMISE: ${S.premise}
+CURRENT DATE: ${S.date} · TURN ${S.turn}
+STORY SO FAR: ${S.chronicle}
+
+FACTIONS
+${c.fac}
+
+REGIONS
+${c.reg}
+
+KEY FIGURES
+${c.ch}
+
+AGREEMENTS
+${c.ag}
+
+RECENT OUTLETS (vary away from these)
+${[...new Set((S.headlines||[]).slice(0,16).map(h=>h.outlet))].join("; ")||"none yet"}
+
+REGULAR REPORTS (deliver one inbox message for each)
+${inboxContext().st}
+
+RECENT INBOX
+${inboxContext().rec}
+
+RECENT TURNS AND CONVERSATIONS
+${c.recent}
+
+PLAYER'S NEW ORDER:
+"""${order}"""
+
+REMEMBER: write the report prose, then a line containing only @@STATE@@, then the JSON object. The JSON is required every turn; the map, date and news depend on it.`;
+}
+function splitReport(text){
+  let i=text.indexOf("@@STATE@@"), len=9;
+  if(i<0){ const m=text.match(/@@\s*STATE\s*@@/i); if(m){i=m.index;len=m[0].length;} }
+  if(i<0){ const m=text.match(/\n\s*(?:```(?:json)?\s*)?\{\s*"(?:date|headline|chronicle)"/); if(m){i=m.index;len=0;} }
+  if(i<0) return [text.trim(),""];
+  return [text.slice(0,i).replace(/[*_\s]+$/,"").trim(), text.slice(i+len)];
+}
+function parseState(raw){
+  let s=raw.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=s.indexOf("{"), b=s.lastIndexOf("}");
+  if(a<0||b<=a) throw new Error("no json");
+  return JSON.parse(s.slice(a,b+1));
+}
+function applyUpdate(u){
+  if(!u||typeof u!=="object") return;
+  if(u.date) S.date=String(u.date);
+  if(u.chronicle) S.chronicle=String(u.chronicle).slice(0,1200);
+  (Array.isArray(u.factions)?u.factions:[]).forEach(fu=>{
+    if(!fu||!fu.id) return;
+    let f=S.factions.find(f=>f.id===fu.id);
+    if(!f){ if(!fu.name) return; f={id:String(fu.id),name:String(fu.name),leader:fu.leader||"",strength:50,economy:50,morale:50,stance:"neutral",note:""}; S.factions.push(f); }
+    ["strength","economy","morale"].forEach(k=>{if(fu[k]!=null) f[k]=clamp(fu[k]);});
+    if(fu.stance && f.id!==S.player) f.stance=String(fu.stance);
+    if(fu.note!=null) f.note=String(fu.note).slice(0,160);
+    if(fu.name) f.name=String(fu.name);
+    if(fu.leader) f.leader=String(fu.leader);
+  });
+  (Array.isArray(u.newRegions)?u.newRegions:[]).forEach(r=>{
+    if(!r||!r.id||!r.name||S.regions.some(x=>x.id===r.id)||S.regions.length>40) return;
+    const x=Number(r.x),y=Number(r.y); if(!isFinite(x)||!isFinite(y)) return;
+    const nr={id:String(r.id),name:String(r.name),x:Math.max(3,Math.min(97,x)),y:Math.max(3,Math.min(97,y)),owner:r.owner||null,terrain:r.terrain||"",contested:!!r.contested};
+    if(isFinite(Number(r.lat))&&isFinite(Number(r.lon))&&r.lat!==null){nr.lat=Number(r.lat);nr.lon=Number(r.lon);nr.countries=Array.isArray(r.countries)?r.countries.map(String):[];nr.sea=!!r.sea;}
+    S.regions.push(nr);
+  });
+  (Array.isArray(u.regions)?u.regions:[]).forEach(ru=>{
+    const r=S.regions.find(r=>r.id===ru?.id); if(!r) return;
+    if("owner" in ru) r.owner=(ru.owner&&S.factions.some(f=>f.id===ru.owner))?ru.owner:(ru.owner===null||ru.owner===""?null:r.owner);
+    if("contested" in ru) r.contested=!!ru.contested;
+  });
+  (Array.isArray(u.characters)?u.characters:[]).forEach(cu=>{
+    if(!cu||!cu.name) return;
+    let c=findPerson(cu.name);
+    if(!c){ if(S.characters.length>=18) return; c={name:String(cu.name)}; S.characters.push(c);}
+    ["role","faction","mood","status"].forEach(k=>{if(cu[k]!=null) c[k]=String(cu[k]);});
+  });
+  if(u.casualties){S.casualties.player+=Math.max(0,Math.round(Number(u.casualties.player)||0));S.casualties.enemy+=Math.max(0,Math.round(Number(u.casualties.enemy)||0));}
+  const posts=(Array.isArray(u.feed)?u.feed:[]).filter(p=>p&&p.text).slice(0,5).map(p=>({author:String(p.author||"Unknown"),handle:String(p.handle||"anon"),faction:p.faction||"",text:String(p.text),date:S.date,_fresh:true}));
+  S.feed=[...posts,...S.feed].slice(0,60);
+  const newMail=addMessages(u.inbox);
+  (Array.isArray(u.standing)?u.standing:[]).forEach(x=>{if(x&&x.who&&x.what) addStanding(x.who,x.what);});
+  const heads=(Array.isArray(u.headlines)?u.headlines:[]).filter(h=>h&&h.text).slice(0,8).map(h=>({outlet:String(h.outlet||"Wire report"),text:String(h.text),date:S.date,turn:S.turn,_fresh:true}));
+  if(heads.length) S.headlines=[...heads,...(S.headlines||[])].slice(0,60);
+  S.events=(Array.isArray(u.events)?u.events:[]).slice(0,6);
+  S.moves=(Array.isArray(u.moves)?u.moves:[]).filter(m=>m&&S.regions.some(r=>r.id===m.from)&&S.regions.some(r=>r.id===m.to)).slice(0,8).map(m=>({from:String(m.from),to:String(m.to),faction:S.factions.some(f=>f.id===m.faction)?m.faction:"",kind:String(m.kind||"advance")}));
+  if(Array.isArray(u.suggestions)&&u.suggestions.length) S.suggestions=u.suggestions.map(String).slice(0,3);
+  if(u.outcome) S.outcome=String(u.outcome);
+  return {headline:u.headline?String(u.headline):"",events:S.events,outcome:u.outcome?String(u.outcome):null,newMail};
+}
+const ERR_COPY={
+  not_granted:"Claude isn't allowed to run for this page. Allow it when asked, then press Retry.",
+  sampling_disabled:"Claude isn't available for this account.",
+  rate_limited:"You've hit a usage limit. Wait a little, then press Retry.",
+  refused:"That order couldn't be carried out as written. Try wording it differently.",
+  session_expired:"You've been signed out. Sign in again, then press Retry.",
+  prompt_too_large:"This war has grown too long to send in one piece. Undo a turn or start a new campaign.",
+  empty_completion:"No report came back. Press Retry.",
+};
+async function sendOrder(order){
+  order=order.trim(); if(!order||busy||!S) return;
+  if(!sample){showLogError(null,"Claude isn't available in this view. Open the page inside Claude to play.");return;}
+  lastOrder=order;
+  history.push(JSON.stringify(S)); if(history.length>6) history.shift();
+  S.log.push({kind:"order",turn:S.turn,date:S.date,text:order});
+  const rep={kind:"report",turn:S.turn,date:"…",headline:"",text:"",events:[]};
+  S.log.push(rep);
+  stickBottom=true;
+  renderLog();
+  const node=$("#log").lastElementChild; node.classList.add("pending");
+  const prose=node.querySelector(".prose");
+  $("#orderIn").value="";autoGrow();
+  setBusy(true);
+  ctl=new AbortController();
+  try{
+    const {text,truncated}=await sample(buildTurnPrompt(order),{cache:false,signal:ctl.signal,onText:({text})=>{
+      let vis=text; const m=vis.indexOf("@@"); if(m>=0) vis=vis.slice(0,m);
+      prose.textContent=vis.trim(); scrollToLatest();
+    }});
+    const [prosePart,statePart]=splitReport(text);
+    rep.text=prosePart;
+    prose.textContent=prosePart;
+    let u=null;
+    if(statePart){ try{ u=parseState(statePart); }catch(e){ u=null; } }
+    if(!u||typeof u!=="object"){
+      // The reply came back without its update block: ask for it on its own.
+      setBusy(true,"Updating the map and news…");
+      try{ u=await sample.json(buildTurnPrompt(order)+`\n\nTHE REPORT FOR THIS ORDER HAS ALREADY BEEN WRITTEN:\n"""${prosePart}"""\n\nReturn ONLY the JSON object from step 3 of the output format, matching this report exactly. No prose.`,{cache:false,signal:ctl.signal}); }
+      catch(e){ if(e&&e.code==="cancelled") throw e; u=null; }
+    }
+    let meta={headline:"",events:[],outcome:null};
+    if(u&&typeof u==="object") meta=applyUpdate(u)||meta;
+    else rep.note="The map and news couldn't be updated this turn. Your next order will catch them up.";
+    rep.date=S.date; rep.headline=meta.headline; rep.events=meta.events; rep.outcome=meta.outcome;
+    S.turn+=1;
+    if(truncated) rep.note="This report was cut short.";
+    setBusy(false);
+    renderAll();
+    if(meta.newMail) showToast(meta.newMail===1?"1 new message in your inbox":`${meta.newMail} new messages in your inbox`,true);
+    if(isNarrow()&&view!=="wire") $("#wireDot").hidden=false;
+    if(rep.note){const last=$("#log").lastElementChild;last.insertAdjacentHTML("beforeend",`<div class="report"><div class="err">${esc(rep.note)}</div></div>`);}
+    saveGame();
+  }catch(e){
+    // roll back to before this order
+    S=JSON.parse(history.pop());
+    setBusy(false);
+    renderAll();
+    $("#orderIn").value=order;autoGrow();
+    if(e&&e.code==="cancelled") return;
+    showLogError(e);
+  }
+}
+/* ===================== TALK (no time passes) ===================== */
+let mode="order", talkTarget="";
+function setMode(m){
+  mode=m;
+  document.querySelectorAll(".mode").forEach(b=>{const on=b.dataset.mode===m;b.classList.toggle("on",on);b.setAttribute("aria-pressed",String(on));});
+  $("#talkTo").hidden=m!=="talk";
+  $("#orderIn").placeholder=m==="talk"?"Say something… e.g. “What would it take for France to commit its army?”":"Give an order… e.g. “Send the 3rd Armored to hold the river crossing at dawn”";
+  $("#modeHint").textContent=m==="talk"?"Talking takes no time, so the map and news only move when you give an order. Deals you make carry into the next turn.":"Orders take a turn and time passes. To talk to someone without using a turn, switch to Talk.";
+  $("#sendBtn").textContent=m==="talk"?"Say":"Send";
+  if(m==="talk") renderTalkTargets();
+  if(S) renderChips();
+}
+function renderTalkTargets(){
+  if(!S) return;
+  const sel=$("#talkSel"); const alive=S.characters.filter(c=>c.status!=="dead");
+  sel.innerHTML=alive.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}${c.role?" — "+esc(c.role):""}</option>`).join("")+`<option value="__new">Someone else…</option>`;
+  if(talkTarget&&alive.some(c=>c.name===talkTarget)) sel.value=talkTarget;
+  else if(talkTarget==="__new"||!alive.length) sel.value="__new";
+  else {talkTarget=alive[0]?.name||"__new"; sel.value=talkTarget;}
+  $("#talkNew").hidden=sel.value!=="__new";
+}
+function talkTo(name){
+  setView("cmd");
+  setMode("talk"); talkTarget=name; renderTalkTargets();
+  $("#orderIn").focus();
+}
+function buildTalkPrompt(who,isNew,said){
+  const pf=S.factions.find(f=>f.id===S.player);
+  const c=compactState();
+  const ch=S.characters.find(x=>x.name===who);
+  const convo=S.log.filter(e=>(e.kind==="say"&&e.to===who)||(e.kind==="reply"&&e.from===who)).slice(-12)
+    .map(e=>e.kind==="say"?`PLAYER: ${e.text}`:`${who}: ${e.text}`).join("\n");
+  const reports=S.log.filter(e=>e.kind==="report").slice(-2).map(e=>`(${e.date}) ${String(e.text).slice(0,600)}`).join("\n\n");
+  const person=isNew
+    ?`The player wants to talk to: "${who}". Create this person so they fit the world: a real name, a rank or title, and a faction id from the list (usually the player's own side, "${S.player}", unless clearly someone else's). Then answer as them.`
+    :`CHARACTER: ${ch.name} | ${ch.role||""} | faction ${ch.faction||"none"} | current mood: ${ch.mood||"unknown"}${ch.status&&ch.status!=="active"?" | status: "+ch.status:""}`;
+  return `You are playing ONE character in a war simulation called "Theater of War". The player commands ${pf?pf.name:"a faction"} (faction id "${S.player}") and is speaking to this person directly. This is a conversation, not a turn: no time passes and nothing happens on the battlefield while they talk.
+
+${person}
+
+HOW TO PLAY THEM
+- Speak in first person, in their own voice, personality and loyalties. They know what someone in their position would know, and nothing more.
+- The player's own advisors give honest, specific advice drawn from the current situation, and may disagree with the player.
+- Leaders of other factions pursue their own interests. They can bargain, stall, refuse, threaten, bluff or make demands. Don't hand out agreements for free; a real deal needs something in return or a strong argument.
+- 40-160 words of spoken reply. A brief action in *asterisks* is fine. No headings, no lists.
+
+OUTPUT FORMAT — exactly this:
+1) The spoken reply.
+2) A line containing only @@STATE@@
+3) One JSON object, no code fence:
+{"name":"the character's full name","role":"their role or title","faction":"faction id","mood":"2-5 words","agreement":null,"stance":null,"standing":null,"feed":[]}
+- agreement: null, or what BOTH sides concretely agreed in this exchange, under 20 words (e.g. "France moves 2 divisions to Strasbourg in exchange for air cover").
+- stance: null, or "ally|neutral|hostile|war" only if this person leads a foreign faction and the conversation genuinely changes relations with the player.
+- standing: null, or a short description if this person has just agreed to send the player a recurring report or update (e.g. "weekly report on air force readiness"). It will arrive in the player's inbox every turn.
+- feed: usually []. Add ONE post {"author","handle","faction","text"} only if word of this conversation would realistically get out right away (a public statement, a press leak, a rumor among staff, a foreign ministry reacting).
+
+WORLD: ${S.title}
+PREMISE: ${S.premise}
+CURRENT DATE: ${S.date}
+STORY SO FAR: ${S.chronicle}
+
+FACTIONS
+${c.fac}
+
+KEY FIGURES
+${c.ch}
+
+AGREEMENTS
+${c.ag}
+
+LATEST REPORTS
+${reports}
+
+MESSAGES THIS PERSON HAS SENT THE PLAYER
+${inboxList().filter(m=>m.from===who).slice(0,3).map(m=>`[${m.date}] ${m.subject}: ${m.body.slice(0,500)}`).join("\n")||"(none)"}
+
+CONVERSATION SO FAR WITH THIS PERSON
+${convo||"(none yet)"}
+
+THE PLAYER NOW SAYS:
+"""${said}"""`;
+}
+async function sendTalk(said){
+  said=said.trim(); if(!said||busy||!S) return;
+  if(!sample){showLogError(null,"Claude isn't available in this view. Open the page inside Claude to play.");return;}
+  let who=$("#talkSel").value, isNew=false;
+  if(who==="__new"){who=$("#talkNew").value.trim(); isNew=true; if(!who){$("#talkNew").focus();$("#modeHint").textContent="Type who you want to talk to first.";return;}}
+  lastOrder=said; lastWasTalk=true;
+  history.push(JSON.stringify(S)); if(history.length>6) history.shift();
+  const ch=S.characters.find(x=>x.name===who);
+  S.log.push({kind:"say",to:who,date:S.date,text:said});
+  const rep={kind:"reply",from:who,faction:ch?.faction||"",role:ch?.role||"",date:S.date,text:""};
+  S.log.push(rep);
+  stickBottom=true;
+  renderLog();
+  const node=$("#log").lastElementChild; node.classList.add("pending");
+  const prose=node.querySelector(".prose");
+  $("#orderIn").value="";autoGrow();
+  setBusy(true,"Waiting for a reply…");
+  ctl=new AbortController();
+  try{
+    const {text}=await sample(buildTalkPrompt(who,isNew,said),{cache:false,signal:ctl.signal,onText:({text})=>{
+      let vis=text; const m=vis.indexOf("@@"); if(m>=0) vis=vis.slice(0,m);
+      prose.textContent=vis.trim(); scrollToLatest();
+    }});
+    const parts=text.split("@@STATE@@");
+    rep.text=parts[0].trim();
+    let u={}; try{ if(parts[1]) u=parseState(parts[1]); }catch(e){}
+    // who actually answered (a new person gets a real name)
+    let person=ch;
+    if(isNew){
+      const nm=String(u.name||who).trim();
+      person=findPerson(nm);
+      if(!person){person={name:nm,role:String(u.role||who),faction:S.factions.some(f=>f.id===u.faction)?u.faction:S.player,mood:String(u.mood||""),status:"active"};S.characters.push(person);}
+      S.log[S.log.length-2].to=person.name;
+      $("#talkNew").value="";
+    }
+    rep.from=person.name; rep.role=person.role||""; rep.faction=person.faction||"";
+    if(u.mood) person.mood=String(u.mood);
+    if(u.role&&!person.role) person.role=String(u.role);
+    if(u.agreement){
+      rep.agreement=String(u.agreement).slice(0,200);
+      S.agreements=S.agreements||[]; S.agreements.push({text:rep.agreement,with:person.name,date:S.date});
+      if(S.agreements.length>20) S.agreements=S.agreements.slice(-20);
+    }
+    const f=S.factions.find(f=>f.id===person.faction);
+    if(u.stance&&f&&f.id!==S.player&&["ally","neutral","hostile","war"].includes(u.stance)&&u.stance!==f.stance){
+      rep.stanceChange=`${f.name}: ${stanceLabel(f.stance)} → ${stanceLabel(u.stance)}`; f.stance=u.stance;
+    }
+    if(u.standing&&typeof u.standing==="string"&&addStanding(person.name,u.standing)) rep.standing=String(u.standing).slice(0,140);
+    const leak=(Array.isArray(u.feed)?u.feed:[]).filter(x=>x&&x.text).slice(0,1).map(x=>({author:String(x.author||"Unknown"),handle:String(x.handle||"anon"),faction:x.faction||"",text:String(x.text),date:S.date,_fresh:true}));
+    if(leak.length) S.feed=[...leak,...S.feed].slice(0,60);
+    talkTarget=person.name;
+    setBusy(false);
+    renderAll();
+    saveGame();
+  }catch(e){
+    S=JSON.parse(history.pop());
+    setBusy(false);
+    renderAll();
+    $("#orderIn").value=said;autoGrow();
+    if(e&&e.code==="cancelled") return;
+    showLogError(e);
+  }
+}
+let lastWasTalk=false;
+function submitInput(){
+  const v=$("#orderIn").value;
+  if(mode==="talk") return sendTalk(v);
+  // "@Name ..." typed in order mode is a conversation, not a turn
+  const m=v.trim().match(/^@(.+)$/s);
+  if(m&&S){
+    const c=[...S.characters].sort((a,b)=>b.name.length-a.name.length).find(c=>m[1].toLowerCase().startsWith(c.name.toLowerCase()));
+    if(c){talkTarget=c.name;setMode("talk");$("#orderIn").value=m[1].slice(c.name.length).replace(/^[\s,:]+/,"");return sendTalk($("#orderIn").value);}
+  }
+  lastWasTalk=false;
+  return sendOrder(v);
+}
+
+function showLogError(e,msg){
+  const m=msg||ERR_COPY[e?.code]||"The connection dropped before the report came in. Your order is back in the box.";
+  const log=$("#log");
+  stickBottom=true;
+  log.insertAdjacentHTML("beforeend",`<div class="entry report"><div class="err"><span>${esc(m)}</span>${lastOrder&&!msg?`<button class="btn" id="retryBtn" type="button">Retry</button>`:""}</div></div>`);
+  scrollToLatest(true);
+  const rb=$("#retryBtn"); if(rb) rb.onclick=()=>{rb.closest(".entry").remove();const v=$("#orderIn").value||lastOrder;if(lastWasTalk){setMode("talk");sendTalk(v);}else sendOrder(v);};
+}
+function setBusy(b,label){
+  busy=b;
+  $("#sendBtn").hidden=b; $("#stopBtn").hidden=!b;
+  $("#busyLbl").textContent=b?(label||"Awaiting reports…"):"";
+  document.querySelectorAll(".mode").forEach(x=>x.disabled=b);
+  $("#undoBtn").disabled=b||history.length===0; $("#undoBtn2").disabled=b||history.length===0;
+  document.querySelectorAll(".chip").forEach(c=>c.disabled=b);
+}
+
+/* ===================== WORLD GENERATION ===================== */
+async function generateWorld(premise,side,statusEl,btn){
+  if(!sample){statusEl.textContent="Claude isn't available in this view.";return;}
+  btn.disabled=true; statusEl.textContent="Drawing up your world… this can take up to a minute.";
+  const prompt=`Design the opening of a war simulation game from this player's idea.
+
+PLAYER'S IDEA: """${premise}"""
+PLAYER WANTS TO COMMAND: """${side||"the side that makes the most sense"}"""
+
+Return ONLY one JSON object with this shape:
+{"title":"short evocative name of this war","date":"in-world starting date/time in a style fitting the setting","premise":"2-3 sentences describing the setting, era, technology and stakes, for the game master","player":"faction id the player commands",
+"factions":[{"id":"short_id","name":"...","leader":"...","strength":0-100,"economy":0-100,"morale":0-100,"stance":"player|ally|neutral|hostile|war","note":"one line on their situation"}],
+"realWorld":true or false,
+"regions":[{"id":"short_id","name":"...","x":0-100,"y":0-100,"lat":null,"lon":null,"countries":[],"sea":false,"owner":"faction id or null","terrain":"1-3 words","contested":false}],
+"characters":[{"name":"...","role":"...","faction":"id","mood":"2-5 words"}],
+"headline":"4-7 word headline","opening":"Opening situation in second person, present tense, 150-220 words, plain paragraphs separated by blank lines, ending with the player about to give orders",
+"chronicle":"one-paragraph summary under 80 words",
+"headlines":[{"outlet":"in-world outlet name","text":"headline under 12 words"}],
+"feed":[{"author":"...","handle":"short_handle","faction":"id or empty","text":"under 40 words"}],
+"suggestions":["three short opening orders, under 8 words each"]}
+
+Requirements: 3-6 factions (exactly one with stance "player"; at least one at "war" with the player). 12-20 regions laid out like a believable map: x is west-east, y is north-south, each faction's regions clustered together, spread across the whole 0-100 area, no two regions closer than 9 units. At least one region contested. 4-6 characters including the player's own commanders and at least one enemy leader. 3 feed posts. 4-5 headlines, each from a different kind of outlet (national paper, wire service, radio, foreign or enemy press, local paper). If the idea is set in a real historical war, keep it historically grounded.
+If the war happens on the real Earth (historical, present or near future), set "realWorld": true and give every region its real "lat"/"lon" (decimal degrees, west/south negative), the modern "countries" it covers${GEO.status==="ready"?" spelled exactly as in this list: "+GEO.feats.map(f=>f.name).join("; "):""}, and "sea": true for ocean regions. Otherwise set "realWorld": false and leave lat/lon null.`;
+  ctl=new AbortController();
+  try{
+    const w=await sample.json(prompt,{cache:false,signal:ctl.signal});
+    if(!w||!Array.isArray(w.factions)||!Array.isArray(w.regions)||!w.regions.length) throw {code:"invalid_json"};
+    if(!w.factions.some(f=>f.id===w.player)){ const p=w.factions.find(f=>f.stance==="player")||w.factions[0]; w.player=p.id; }
+    w.factions.forEach(f=>{if(f.id===w.player) f.stance="player";});
+    w.regions=w.regions.filter(r=>r&&r.id&&r.name).map(r=>({...r,x:Math.max(3,Math.min(97,Number(r.x)||50)),y:Math.max(3,Math.min(97,Number(r.y)||50)),owner:w.factions.some(f=>f.id===r.owner)?r.owner:null}));
+    const real=w.realWorld===true&&w.regions.some(r=>isFinite(Number(r.lat))&&r.lat!==null);
+    w.regions.forEach(r=>{if(real&&isFinite(Number(r.lat))&&r.lat!==null){r.lat=Number(r.lat);r.lon=Number(r.lon);r.countries=Array.isArray(r.countries)?r.countries.map(String):[];r.sea=!!r.sea;}else{delete r.lat;delete r.lon;}});
+    S=newGameFrom({...w,geo:real,geoChecked:true,opening:w.opening||"The war begins.",title:w.title||"Untitled war",premise:w.premise||premise});
+    history=[];
+    statusEl.textContent="";
+    showGame();
+    saveGame();
+  }catch(e){
+    statusEl.textContent=e?.code==="invalid_json"?"The world came back garbled. Press Build again.":(ERR_COPY[e?.code]||"The connection dropped while building. Press Build again.");
+  }finally{btn.disabled=false;}
+}
+
+/* ===================== SAVES ===================== */
+function setSaveState(t){$("#saveState").textContent=t;}
+function serialize(){
+  const copy={...S,log:S.log.slice(-80),feed:S.feed.slice(0,40)};
+  let str=JSON.stringify(copy);
+  while(str.length>200000 && copy.log.length>10){copy.log=copy.log.slice(10);str=JSON.stringify(copy);}
+  return str;
+}
+function saveGame(){
+  if(!S) return;
+  S.updated=Date.now();
+  const str=serialize(); const meta={title:S.title,date:S.date,turn:S.turn,updated:S.updated,state:str};
+  const id=S.id;
+  saveSeq=saveSeq.then(async()=>{
+    if(db&&uid){
+      setSaveState("Saving…");
+      try{ await db.collection("data/users/"+uid).doc(id).set(meta); setSaveState("Saved"); return; }
+      catch(e){ /* fall through to local */ }
+    }
+    try{
+      const all=JSON.parse(localStorage.getItem("tow.saves")||"{}"); all[id]=meta; localStorage.setItem("tow.saves",JSON.stringify(all));
+      setSaveState("Saved on this device");
+    }catch(e){ setSaveState("Not saved"); }
+  });
+}
+async function listSaves(){
+  const out={};
+  try{const all=JSON.parse(localStorage.getItem("tow.saves")||"{}");Object.entries(all).forEach(([id,m])=>out[id]={...m,id,where:"local"});}catch(e){}
+  if(db&&uid){
+    try{const snap=await db.collection("data/users/"+uid).orderBy("updated","desc").limit(30).get();
+      snap.docs.forEach(d=>{const m=d.data();if(m&&m.state&&(!out[d.id]||out[d.id].updated<=m.updated)) out[d.id]={...m,id:d.id,where:"cloud"};});
+    }catch(e){}
+  }
+  return Object.values(out).sort((a,b)=>(b.updated||0)-(a.updated||0));
+}
+async function deleteSave(s){
+  try{const all=JSON.parse(localStorage.getItem("tow.saves")||"{}");delete all[s.id];localStorage.setItem("tow.saves",JSON.stringify(all));}catch(e){}
+  if(db&&uid){try{await db.collection("data/users/"+uid).doc(s.id).delete();}catch(e){}}
+  renderSaves();
+}
+let savesCache=[];
+async function renderSaves(){
+  savesCache=await listSaves();
+  const box=$("#savesBox"); box.hidden=!savesCache.length;
+  $("#saveList").innerHTML=savesCache.map((s,i)=>`<div class="save-item"><div class="meta"><div class="t">${esc(s.title)}</div><div class="s">Turn ${esc(s.turn)} · ${esc(s.date)}</div></div><div class="acts"><button class="btn primary" data-load="${i}">Continue</button><button class="btn ghost" data-del="${i}" aria-label="Delete campaign">✕</button></div></div>`).join("");
+}
+
+/* ===================== SETUP SCREEN ===================== */
+function renderSetup(){
+  const grid=$("#scenGrid");
+  grid.innerHTML=PRESETS.map((p,i)=>{
+    const pf=p.factions.find(f=>f.id===p.player); const foe=p.factions.filter(f=>f.stance==="war").map(f=>f.name).join(", ");
+    return `<div class="scen"><canvas data-prev="${i}"></canvas><div class="era">${esc(p.era)}</div><h3>${esc(p.title)}</h3><p>${esc(p.blurb)}</p><div class="you">You command <b>${esc(pf.name)}</b> against ${esc(foe)}.</div><button class="btn primary" data-start="${i}">Take command</button></div>`;
+  }).join("")+
+  `<form class="scen custom" id="customForm"><div class="era">Your own war</div><h3>Describe any war</h3>
+    <div class="field"><label class="label" for="cPremise">The war</label><textarea id="cPremise" rows="4" placeholder="e.g. The American Civil War, but Britain joins the Confederacy in 1862. Or: zombies overrun Europe and the last armies hold the Alps."></textarea></div>
+    <div class="field"><label class="label" for="cSide">You command</label><input id="cSide" placeholder="e.g. the Union Army of the Potomac"></div>
+    <div class="gen-status" id="genStatus"></div>
+    <button class="btn primary" id="genBtn" type="submit">Build this world</button></form>`;
+  requestAnimationFrame(drawPreviews);
+}
+function drawPreviews(){
+    document.querySelectorAll("canvas[data-prev]").forEach(cv=>{
+      const p=PRESETS[+cv.dataset.prev]; const st=newGameFrom(p); st.factions.forEach((f,i)=>{if(f.id!==st.player)f.color=PAL_OTHERS[st.factions.filter(x=>x.id!==st.player).indexOf(f)%PAL_OTHERS.length];});
+      drawPreview(cv,st);
+    });
+}
+function showGame(){
+  $("#setup").hidden=true;$("#game").hidden=false;
+  talkTarget="";setMode("order");
+  setSaveState("");
+  window.scrollTo(0,0);
+  closeInbox(); $("#toast").hidden=true; stickBottom=true;
+  requestAnimationFrame(()=>{renderAll();setView("cmd");ensureRealMap();});
+}
+function showSetup(){
+  if(busy) ctl?.abort();
+  $("#game").hidden=true;$("#setup").hidden=false;
+  renderSetup();renderSaves();window.scrollTo(0,0);
+}
+
+/* ===================== INBOX & REGULAR REPORTS ===================== */
+const KIND_LABEL={report:"Report",letter:"Letter",cable:"Cable",demand:"Demand",offer:"Offer",intel:"Intel",alert:"Alert"};
+function inboxList(){return S&&Array.isArray(S.inbox)?S.inbox:[];}
+function unreadCount(){return inboxList().filter(m=>!m.read).length;}
+function renderInboxBadge(){
+  const n=unreadCount(); const b=$("#inboxBadge");
+  b.hidden=!n; b.textContent=n>9?"9+":String(n);
+  $("#inboxBtn").setAttribute("aria-label",n?`Inbox, ${n} unread`:"Inbox");
+}
+const TITLES=/^(gen|general|adm|admiral|col|colonel|maj|major|capt|captain|lt|sgt|sergeant|cpl|pvt|mr|mrs|ms|dr|sir|lord|lady|president|prime|minister|chancellor|marshal|field|amb|ambassador|sen|senator|secretary|premier|king|queen|prince|emperor|chairman|comrade|herr|general-?major)\.?$/i;
+function nameTokens(n){return String(n||"").toLowerCase().replace(/[^a-z0-9\s.'-]/g," ").split(/\s+/).map(t=>t.replace(/\.$/,"")).filter(t=>t&&!TITLES.test(t));}
+function findPerson(name){
+  const low=String(name||"").toLowerCase().trim(); if(!low) return null;
+  const exact=S.characters.find(c=>c.name.toLowerCase()===low); if(exact) return exact;
+  const a=nameTokens(name).filter(t=>t.length>1); if(!a.length) return null;
+  return S.characters.find(c=>{const b=nameTokens(c.name).filter(t=>t.length>1); if(!b.length) return false;
+    const [small,big]=a.length<=b.length?[a,b]:[b,a]; return small.every(t=>big.includes(t))&&a[a.length-1]===b[b.length-1];})||null;
+}
+function addMessages(list){
+  const msgs=(Array.isArray(list)?list:[]).filter(m=>m&&m.body).slice(0,6).map(m=>({
+    id:uidGen(),from:(findPerson(m.from)?.name)||String(m.from||"Unknown sender"),role:String(m.role||findPerson(m.from)?.role||""),
+    faction:S.factions.some(f=>f.id===m.faction)?m.faction:"",
+    kind:KIND_LABEL[String(m.kind||"").toLowerCase()]?String(m.kind).toLowerCase():"letter",
+    subject:String(m.subject||"(no subject)").slice(0,120),body:String(m.body),date:S.date,turn:S.turn,read:false}));
+  if(!msgs.length) return 0;
+  S.inbox=[...msgs,...inboxList()].slice(0,60);
+  msgs.forEach(m=>{
+    if(!findPerson(m.from)&&S.characters.length<18&&m.faction)
+      S.characters.push({name:m.from,role:m.role,faction:m.faction,mood:"",status:"active"});
+  });
+  return msgs.length;
+}
+function addStanding(who,what){
+  what=String(what||"").trim(); who=String(who||"").trim(); if(!what||!who) return false;
+  S.standing=Array.isArray(S.standing)?S.standing:[];
+  if(S.standing.some(x=>x.who===who&&x.what.toLowerCase()===what.toLowerCase())) return false;
+  S.standing.push({id:uidGen(),who,what:what.slice(0,140),since:S.date});
+  if(S.standing.length>8) S.standing.shift();
+  return true;
+}
+function inboxContext(){
+  const st=(S.standing||[]).map(x=>`- ${x.who}: ${x.what} (since ${x.since})`).join("\n")||"none";
+  const rec=inboxList().slice(0,5).map(m=>`- turn ${m.turn}, ${m.kind} from ${m.from}: ${m.subject}`).join("\n")||"none";
+  return {st,rec};
+}
+let ibOpenId=null, ibHist=0;
+function pushHist(tag){try{window.history.pushState({tow:tag},"");ibHist++;}catch(e){}}
+// the phone's Back gesture steps back inside the inbox: message -> list -> closed
+window.addEventListener("popstate",()=>{
+  if(ibHist>0) ibHist--;
+  if($("#inbox").hidden) return;
+  if(ibOpenId){ibOpenId=null;renderInbox();$("#inbox .ib-body").scrollTop=0;}
+  else closeInbox(true);
+});
+function backToList(){
+  if(ibHist>=2){try{window.history.back();return;}catch(e){}}
+  ibOpenId=null;renderInbox();$("#inbox .ib-body").scrollTop=0;
+}
+function openMessage(id){
+  if(!ibOpenId) pushHist("msg");
+  ibOpenId=id;renderInbox();$("#inbox .ib-body").scrollTop=0;
+}
+function openInbox(id){
+  $("#toast").hidden=true;
+  $("#inbox").hidden=false;$("#inboxBg").hidden=false;document.body.classList.add("drawer-open");
+  if(!ibHist) pushHist("inbox");
+  ibOpenId=null; renderInbox();
+  if(id) openMessage(id);
+  setTimeout(()=>$("#inboxClose").focus(),0);
+}
+function closeInbox(fromPop){
+  const wasOpen=!$("#inbox").hidden;
+  $("#inbox").hidden=true;$("#inboxBg").hidden=true;document.body.classList.remove("drawer-open");ibOpenId=null;
+  if(wasOpen&&fromPop!==true&&ibHist>0){const n=ibHist;ibHist=0;try{window.history.go(-n);}catch(e){}}
+}
+function renderInbox(){
+  if(!S) return;
+  const list=inboxList();
+  const m=ibOpenId?list.find(x=>x.id===ibOpenId):null;
+  $("#ibList").hidden=!!m; $("#ibRead").hidden=!m; $("#ibStanding").hidden=!!m;
+  $("#ibHBack").hidden=!m; $("#ibTitle").hidden=!!m;
+  if(m){
+    if(!m.read){m.read=true;saveGame();}
+    $("#ibRead").innerHTML=`<div class="ib-kind k-${esc(m.kind)}">${esc(KIND_LABEL[m.kind]||m.kind)}</div>
+      <h4 class="ib-subj">${esc(m.subject)}</h4>
+      <div class="ib-from"><span class="sw" style="background:${factionColor(m.faction)}"></span><b>${esc(m.from)}</b>${m.role?` · ${esc(m.role)}`:""}</div>
+      <div class="ib-date">${esc(m.date)}</div>
+      <div class="ib-text">${esc(m.body)}</div>
+      <div class="ib-acts"><button class="btn primary" type="button" data-ib-reply="${esc(m.id)}">Reply</button><button class="btn ghost" type="button" data-ib-del="${esc(m.id)}">Delete</button></div>
+      <div class="hint">Replying opens a conversation with ${esc(m.from)}. It takes no time.</div>`;
+  } else {
+    $("#ibList").innerHTML=list.length?list.map(x=>`<button type="button" class="ib-item ${x.read?"":"unread"}" data-ib-open="${esc(x.id)}">
+        <span class="ib-row"><span class="ib-kind k-${esc(x.kind)}">${esc(KIND_LABEL[x.kind]||x.kind)}</span><span class="ib-d">${esc(x.date)}</span></span>
+        <span class="ib-s">${esc(x.subject)}</span>
+        <span class="ib-f"><span class="sw" style="background:${factionColor(x.faction)}"></span>${esc(x.from)}</span></button>`).join("")
+      :`<div class="empty">No messages yet. Reports you ask for and letters from other leaders arrive here when you give orders.</div>`;
+    const st=S.standing||[];
+    $("#stList").innerHTML=st.length?st.map(x=>`<li><span><b>${esc(x.who)}</b> · ${esc(x.what)}</span><button class="rcx" type="button" data-st-del="${esc(x.id)}" aria-label="Stop this report">×</button></li>`).join("")
+      :`<li class="empty" style="padding:4px 0">None yet. Ask someone in Talk (“send me a weekly report”), or set one up here.</li>`;
+    const alive=S.characters.filter(c=>c.status!=="dead");
+    const prev=$("#stWho").value;
+    $("#stWho").innerHTML=alive.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");
+    if(alive.some(c=>c.name===prev)) $("#stWho").value=prev;
+  }
+  renderInboxBadge();
+}
+let toastT=0;
+function showToast(text,withOpen){
+  $("#toastText").textContent=text; $("#toastOpen").hidden=!withOpen; $("#toast").hidden=false;
+  clearTimeout(toastT); toastT=setTimeout(()=>{$("#toast").hidden=true;},8000);
+}
+document.addEventListener("click",e=>{
+  const t=e.target;
+  if(t.closest("#inboxBtn")){openInbox();return;}
+  if(t.closest("#inboxClose")||t.id==="inboxBg"){closeInbox();return;}
+  const op=t.closest("[data-ib-open]"); if(op){openMessage(op.dataset.ibOpen);return;}
+  if(t.closest("[data-ib-back]")||t.closest("#ibHBack")){backToList();return;}
+  const rp=t.closest("[data-ib-reply]");
+  if(rp){const m=inboxList().find(x=>x.id===rp.dataset.ibReply); if(!m) return;
+    if(!S.characters.some(c=>c.name===m.from)) S.characters.push({name:m.from,role:m.role,faction:m.faction,mood:"",status:"active"});
+    closeInbox(); renderAll(); setView("cmd"); talkTo(m.from); return;}
+  const dl=t.closest("[data-ib-del]");
+  if(dl){S.inbox=inboxList().filter(x=>x.id!==dl.dataset.ibDel);saveGame();backToList();return;}
+  const sd=t.closest("[data-st-del]");
+  if(sd){S.standing=(S.standing||[]).filter(x=>x.id!==sd.dataset.stDel);renderInbox();saveGame();return;}
+  if(t.closest("#toastOpen")){$("#toast").hidden=true;openInbox();return;}
+  if(t.closest("#toastClose")){$("#toast").hidden=true;return;}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#inbox").hidden){ if(ibOpenId) backToList(); else closeInbox(); }});
+$("#stForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  if(addStanding($("#stWho").value,$("#stWhat").value)){$("#stWhat").value="";renderInbox();saveGame();showToast("Regular report set up. It arrives with each order you give.",false);}
+});
+
+/* ===================== VIEWS (phone tabs) & SCROLLING ===================== */
+let view="cmd", stickBottom=true;
+const isNarrow=()=>matchMedia("(max-width:1099px)").matches;
+function setView(v){
+  view=v; $(".board").dataset.view=v;
+  document.querySelectorAll("#tabbar [data-view]").forEach(b=>{const on=b.dataset.view===v;b.classList.toggle("on",on);b.setAttribute("aria-current",on?"page":"false");});
+  if(v==="wire") $("#wireDot").hidden=true;
+  if(!isNarrow()) return;
+  if(v==="map") requestAnimationFrame(()=>{mapResize();window.scrollTo(0,0);});
+  else if(v==="cmd") requestAnimationFrame(()=>{stickBottom=true;scrollToLatest(true);});
+  else window.scrollTo(0,0);
+}
+function logScroller(){
+  const lg=$("#log"); const oy=getComputedStyle(lg).overflowY;
+  return (oy==="auto"||oy==="scroll")?lg:null;
+}
+function nearBottom(){
+  const lg=logScroller();
+  if(lg) return lg.scrollHeight-lg.scrollTop-lg.clientHeight<140;
+  const se=document.scrollingElement||document.documentElement;
+  return se.scrollHeight-se.scrollTop-window.innerHeight<260;
+}
+function scrollToLatest(force){
+  if(!force&&!stickBottom) return;
+  const lg=logScroller();
+  if(lg) lg.scrollTop=lg.scrollHeight;
+  else if(isNarrow()&&view==="cmd"){const se=document.scrollingElement||document.documentElement;window.scrollTo(0,se.scrollHeight);}
+}
+// Follow new text only while the reader is at the bottom; scrolling up stops the follow.
+let lastUserScroll=0;
+["wheel","touchmove","pointerdown","keydown"].forEach(ev=>window.addEventListener(ev,()=>{lastUserScroll=Date.now();},{passive:true,capture:true}));
+function onScrollCheck(){ if(Date.now()-lastUserScroll<1200) stickBottom=nearBottom(); }
+$("#log").addEventListener("scroll",onScrollCheck,{passive:true});
+window.addEventListener("scroll",onScrollCheck,{passive:true});
+document.addEventListener("click",e=>{
+  const tb=e.target.closest("#tabbar [data-view]"); if(tb){setView(tb.dataset.view);return;}
+  if(e.target.closest("#moreBtn")){const m=$("#moreMenu");m.hidden=!m.hidden;$("#moreBtn").setAttribute("aria-expanded",String(!m.hidden));return;}
+  if(!e.target.closest("#moreMenu")) {$("#moreMenu").hidden=true;$("#moreBtn").setAttribute("aria-expanded","false");}
+  if(e.target.closest("#undoBtn2")){$("#moreMenu").hidden=true;$("#undoBtn").click();return;}
+  if(e.target.closest("#campBtn2")){$("#moreMenu").hidden=true;showSetup();return;}
+});
+
+/* ===================== EVENTS ===================== */
+function autoGrow(){const t=$("#orderIn");t.style.height="auto";t.style.height=Math.min(180,t.scrollHeight)+"px";}
+document.addEventListener("click",e=>{
+  const st=e.target.closest("[data-start]");
+  if(st){S=newGameFrom(PRESETS[+st.dataset.start]);history=[];showGame();saveGame();return;}
+  const ld=e.target.closest("[data-load]");
+  if(ld){const s=savesCache[+ld.dataset.load];try{S=JSON.parse(s.state);history=[];showGame();}catch(err){}return;}
+  const dl=e.target.closest("[data-del]");
+  if(dl){const s=savesCache[+dl.dataset.del];askConfirm(`Delete “${s.title}”? This can't be undone.`,()=>deleteSave(s));return;}
+  const chip=e.target.closest(".chip");
+  if(chip&&!busy){const v=chip.dataset.s;sendOrder(v==="__time"?"Let about a week pass. Keep my current orders running and report what happens across the whole theater.":v);return;}
+  const say=e.target.closest("[data-say]");
+  if(say&&!busy){$("#orderIn").value=say.dataset.say;sendTalk(say.dataset.say);return;}
+  const md=e.target.closest(".mode");
+  if(md&&!busy){setMode(md.dataset.mode);$("#orderIn").focus();return;}
+  const tk=e.target.closest("[data-talk]")||e.target.closest(".crow");
+  if(tk&&!busy){const c=S.characters[+(tk.dataset.talk??tk.dataset.i)];if(c) talkTo(c.name);return;}
+});
+$("#orderForm").addEventListener("submit",e=>{e.preventDefault();submitInput();});
+$("#orderIn").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submitInput();}});
+$("#talkSel").addEventListener("change",e=>{talkTarget=e.target.value;$("#talkNew").hidden=talkTarget!=="__new";if(talkTarget==="__new")$("#talkNew").focus();});
+$("#orderIn").addEventListener("input",autoGrow);
+$("#stopBtn").onclick=()=>ctl?.abort();
+$("#undoBtn").onclick=()=>{if(busy||!history.length)return;S=JSON.parse(history.pop());renderAll();saveGame();};
+$("#menuBtn").onclick=showSetup;
+document.addEventListener("submit",e=>{
+  if(e.target.id==="customForm"){e.preventDefault();const p=$("#cPremise").value.trim();if(!p){$("#genStatus").textContent="Describe the war first.";return;}generateWorld(p,$("#cSide").value.trim(),$("#genStatus"),$("#genBtn"));}
+});
+function askConfirm(text,yes){
+  $("#confirmText").textContent=text;$("#confirmBox").hidden=false;
+  $("#confirmYes").onclick=()=>{$("#confirmBox").hidden=true;yes();};
+  $("#confirmNo").onclick=()=>{$("#confirmBox").hidden=true;};
+}
+// Only redraw canvases on resize, and only when the WIDTH changes (a phone keyboard opening changes just the height).
+let rT,lastW=window.innerWidth;window.addEventListener("resize",()=>{
+  if(window.innerWidth===lastW) return; lastW=window.innerWidth;
+  clearTimeout(rT);rT=setTimeout(()=>{if(!$("#game").hidden&&S)mapResize();else if(!$("#setup").hidden)drawPreviews();},150);
+});
+
+/* ===================== BOOT ===================== */
+renderSetup();
+renderSaves();
+loadGeo().then(st=>{ if(st==="ready"&&!$("#setup").hidden) drawPreviews(); });
+(async()=>{
+  if(!window.claude||!window.claude.use){$("#claudeNotice").hidden=false;return;}
+  const [smp,d,u]=await Promise.all([claude.use("sample").catch(()=>null),claude.use("db").catch(()=>null),claude.use("user").catch(()=>null)]);
+  sample=smp; db=d;
+  if(S&&!$("#game").hidden) ensureRealMap();
+  if(!sample) $("#claudeNotice").hidden=false;
+  if(u){try{uid=await u.id();}catch(e){uid=null;}}
+  renderSaves();
+})();
+</script>
+</body>
+</html>
