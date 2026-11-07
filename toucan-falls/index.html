@@ -1079,6 +1079,8 @@ function audioInit(){if(AU.ctx)return;try{AU.ctx=new (window.AudioContext||windo
 function tone(f,dur,type,vol,slide,delay){if(!AU.ctx)return;const t=AU.ctx.currentTime+(delay||0);const o=AU.ctx.createOscillator(),g=AU.ctx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+dur);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(AU.master);o.start(t);o.stop(t+dur+0.05);}
 let noiseBuf=null;function getNoise(){if(!noiseBuf){const n=AU.ctx.sampleRate*2;noiseBuf=AU.ctx.createBuffer(1,n,AU.ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;}return noiseBuf;}
 function noiseHit(freq,dur,vol){if(!AU.ctx)return;const t=AU.ctx.currentTime;const s=AU.ctx.createBufferSource();s.buffer=getNoise();const f=AU.ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=freq;f.Q.value=0.8;const g=AU.ctx.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);s.connect(f);f.connect(g);g.connect(AU.master);s.start(t);s.stop(t+dur);}
+// short filtered noise burst, with a delay and adjustable sharpness (for scratchy claw sounds)
+function noiseAt(freq,dur,vol,delay,q){if(!AU.ctx)return;const t=AU.ctx.currentTime+(delay||0);const s=AU.ctx.createBufferSource();s.buffer=getNoise();const f=AU.ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=freq;f.Q.value=q||1.2;const g=AU.ctx.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);s.connect(f);f.connect(g);g.connect(AU.master);s.start(t,Math.random()*1.5);s.stop(t+dur+0.02);}
 function startOcean(){const s=AU.ctx.createBufferSource();s.buffer=getNoise();s.loop=true;const f=AU.ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=420;const g=AU.ctx.createGain();g.gain.value=0.05;const l=AU.ctx.createOscillator(),lg=AU.ctx.createGain();l.frequency.value=0.12;lg.gain.value=0.03;l.connect(lg);lg.connect(g.gain);s.connect(f);f.connect(g);g.connect(AU.master);s.start();l.start();}
 const sfx={
   beat(){tone(62,0.16,'sine',0.7,40);tone(55,0.14,'sine',0.5,38,0.16);},
@@ -1087,7 +1089,10 @@ const sfx={
   splash(){noiseHit(900,0.35,0.35);},
   growl(){tone(95,0.7,'sawtooth',0.14,55);noiseHit(160,0.6,0.25);},
   swoosh(){noiseHit(650,1.1,0.3);tone(330,0.7,'sine',0.07,660);},
-  climb(){tone(420,0.08,'square',0.06);tone(520,0.08,'square',0.05,null,0.07);},
+  // claws digging into bark: a soft woody knock and a few quick scratches
+  claw(){const v=0.7+Math.random()*0.3;tone(150+Math.random()*30,0.07,'triangle',0.05*v,95);for(let i=0;i<3;i++)noiseAt(2600+Math.random()*1400,0.035+Math.random()*0.02,0.11*v,0.01+i*0.032+Math.random()*0.01,2.2);},
+  // claws snagging a vine: a leafy rustle, a couple of light scratches and a little stretchy creak
+  vineGrab(){noiseAt(1300,0.2,0.09,0,0.7);noiseAt(3800,0.12,0.03,0.02,0.9);for(let i=0;i<2;i++)noiseAt(2200+Math.random()*800,0.03,0.07,0.02+i*0.04,2);tone(240,0.16,'sine',0.025,175,0.03);},
   caught(){tone(300,0.4,'triangle',0.2,120);},
   bird(){tone(2300,0.07,'sine',0.06,3100);tone(2500,0.07,'sine',0.05,3300,0.11);},
   pop(){tone(660,0.08,'sine',0.15,990);},
@@ -1234,7 +1239,7 @@ function nearPalm(){if(S.swimming)return null;let best=null,bd=2.1;for(const p o
 function actPress(){if(state!=='play')return;if(S.climb){dropDown();return;}const p=nearPalm();if(p)startClimb(p);}
 function camMoveDir(mx,my){const fx=Math.sin(cam.yaw),fz=Math.cos(cam.yaw);let dx=fx*my-fz*mx,dz=fz*my+fx*mx;const l=Math.hypot(dx,dz);return l>0.001?[dx/l,dz/l]:[0,0];}
 function startClimb(p,t){if(p.vines){if(p.vines.some(e=>e.v.kind==='rope'))hint('vine','See the vine tied to this tree? Push LEFT or RIGHT to grab it and cross hand over hand!',false);if(p.vines.some(e=>e.v.kind==='swing'))hint('swingVine','See the vine hanging from the branch? Push UP to climb to it and SWING across!',false);}
-  if(S.skyU==null)S.skyU=S.u;const ox=S.pos.x-p.x,oz=S.pos.z-p.z,l=Math.hypot(ox,oz)||1;S.climb={palm:p,t:t||0.6,ox:ox/l,oz:oz/l,downT:0};S.frozen=false;S.vel.set(0,0,0);sfx.climb();hintsSeen.climbTip=1;hint('climbDown','Push up to climb higher, down to climb down. Push sideways or turn the camera to circle around the trunk!',false);}
+  if(S.skyU==null)S.skyU=S.u;const ox=S.pos.x-p.x,oz=S.pos.z-p.z,l=Math.hypot(ox,oz)||1;S.climb={palm:p,t:t||0.6,ox:ox/l,oz:oz/l,downT:0};S.frozen=false;S.vel.set(0,0,0);sfx.claw();hintsSeen.climbTip=1;hint('climbDown','Push up to climb higher, down to climb down. Push sideways or turn the camera to circle around the trunk!',false);}
 function dropDown(){skyDone();const c=S.climb,p=c.palm;S.climb=null;S.onTop=false;S.climbCool=1.1;S.bumpT=0;const pt=palmPoint(p,c.t);S.pos.x=pt.x+c.ox*1.3;S.pos.z=pt.z+c.oz*1.3;S.vy=0;S.heading=Math.atan2(c.ox,c.oz);}
 function skyDone(){if(S.skyU==null)return;const d=Math.abs(S.u-S.skyU);S.skyU=null;
   if(d>=25){S.skyBest=Math.max(S.skyBest||0,d);setTimeout(()=>toast('🌳 '+Math.round(d)+' m through the treetops without touching the ground!'+(d>=S.skyBest-0.5&&d>=60?' New best!':'')),400);}}
@@ -1285,7 +1290,7 @@ function updateSloth(dt){
     else S.pos.set(q.x,q.y,q.z);S.heading=Math.atan2(V.ux*S.vineFace,V.uz*S.vineFace);
     S.energy=Math.min(100,S.energy+3*dt);S.swimming=false;S.frozen=false;S.hidden=false;S.onTop=false;
     if((sv.s>=1&&along>0.1)||(sv.s<=0&&along<-0.1)){const toB=sv.s>=1;const T=toB?V.B:V.A,tt=toB?V.tB:V.tA;const sgn=toB?-1:1;
-      S.vine=null;S.vineCool=0.35;S.climb={palm:T,t:tt,ox:V.ux*sgn,oz:V.uz*sgn,downT:0};sfx.climb();}
+      S.vine=null;S.vineCool=0.35;S.climb={palm:T,t:tt,ox:V.ux*sgn,oz:V.uz*sgn,downT:0};sfx.claw();}
     return;
   }
   if(S.vine){
@@ -1301,7 +1306,7 @@ function updateSloth(dt){
       const r=V.L-VHAND;S.pos.set(V.pv.x+Math.sin(ph)*r*V.ux,V.pv.y-Math.cos(ph)*r,V.pv.z+Math.sin(ph)*r*V.uz);
       if(L2&&B.state==='trapped'&&V===SPECIAL.pandaVine&&Math.abs(ph)<0.2)rescueBao();
       if(k>=1){const toB=sv.face>0;const T=toB?V.B:V.A,tt=clamp((toB?V.tB:V.tA)-VHAND,0.5,T.maxT||T.len-0.7);
-        V.held=false;V.ph=ph;V.w=0;S.vine=null;S.vineCool=0.35;S.climb={palm:T,t:tt,ox:-V.ux*sv.face,oz:-V.uz*sv.face,downT:0};sfx.climb();
+        V.held=false;V.ph=ph;V.w=0;S.vine=null;S.vineCool=0.35;S.climb={palm:T,t:tt,ox:-V.ux*sv.face,oz:-V.uz*sv.face,downT:0};sfx.claw();
         hint('vineChain','Nice swing! Some trees have another vine. Push toward the next tree to keep swinging!',false);return;}}
     V.ph=ph;sv.tilt=-sv.face*ph;S.heading=Math.atan2(V.ux*sv.face,V.uz*sv.face);S.moving=1;S.ph+=dt*3;
     return;
@@ -1321,7 +1326,7 @@ function updateSloth(dt){
       if(aim)aimT=(aim.end?aim.v.tB:aim.v.tA)-(aim.v.kind==='rope'?0:VHAND);}
     GO.aim=aim;
     if(aim){ // no climbing up or down first: she leaps straight from where she is onto the vine
-      {const e=aim,V=e.v,sg=e.end?-1:1;S.climb=null;sfx.climb();
+      {const e=aim,V=e.v,sg=e.end?-1:1;S.climb=null;sfx.vineGrab();
         GO.aim=null;
         if(V.kind==='rope'){S.vine={kind:'rope',v:V,s:e.end?1:0,tilt:0,leap:{t:0,from:S.pos.clone()}};S.vineFace=sg;hint('ropeGo','Hang on! She crosses all by herself. Pull back if you want to turn around.',false);}
         else{V.held=true;V.pin=false;S.vine={kind:'swing',v:V,phase:'hook',hookD:clamp(0.3+Math.abs(c.t-aimT)*0.05,0.3,0.5),t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);}
