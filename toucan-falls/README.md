@@ -27,7 +27,7 @@ Some stretches of the trail are treetop trails, with trees zigzagging along both
 
 ## Trot
 
-The 🐾 TROT button gives a short burst of speed, about a second and a half, for getting away from a jaguar. It then needs about six seconds to recharge. On a keyboard, press R or Q.
+The 🐾 TROT button gives a short burst of speed, about a second and a half, for getting away from a jaguar. It uses a good chunk of energy (about a fifth of the bar), then needs about six seconds to recharge. If the bar is nearly empty, she is too tired to trot. On a keyboard, press R or Q.
 
 ## Play
 
