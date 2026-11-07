@@ -1275,18 +1275,20 @@ function updateSloth(dt){
     const sv=S.vine,V=sv.v;const [dx,dz]=camMoveDir(mx,my);const pull=(dx*V.ux+dz*V.uz)*mag;
     if(pull*S.vineFace<-0.5)S.vineFace=-S.vineFace; // pull clearly the other way to turn round
     const along=S.vineFace;
-    sv.s=clamp(sv.s+along*1.9*dt/V.len,0,1);S.moving=1;S.ph+=dt*4.5*S.moving;
-    const q=V.curve.getPoint(sv.s);S.pos.set(q.x,q.y,q.z);S.heading=Math.atan2(V.ux*S.vineFace,V.uz*S.vineFace);
+    if(!sv.leap)sv.s=clamp(sv.s+along*1.9*dt/V.len,0,1);S.moving=1;S.ph+=dt*4.5*S.moving;
+    const q=V.curve.getPoint(sv.s);
+    if(sv.leap){const L_=sv.leap;L_.t+=dt;const k=Math.min(1,L_.t/0.28),e=k*k*(3-2*k);S.pos.set(lerp(L_.from.x,q.x,e),lerp(L_.from.y,q.y,e)+Math.sin(Math.PI*k)*0.35,lerp(L_.from.z,q.z,e));if(k>=1)sv.leap=null;}
+    else S.pos.set(q.x,q.y,q.z);S.heading=Math.atan2(V.ux*S.vineFace,V.uz*S.vineFace);
     S.energy=Math.min(100,S.energy+3*dt);S.swimming=false;S.frozen=false;S.hidden=false;S.onTop=false;
     if((sv.s>=1&&along>0.1)||(sv.s<=0&&along<-0.1)){const toB=sv.s>=1;const T=toB?V.B:V.A,tt=toB?V.tB:V.tA;const sgn=toB?-1:1;
-      S.vine=null;S.vineCool=0.6;S.climb={palm:T,t:tt,ox:V.ux*sgn,oz:V.uz*sgn,downT:0};sfx.climb();}
+      S.vine=null;S.vineCool=0.35;S.climb={palm:T,t:tt,ox:V.ux*sgn,oz:V.uz*sgn,downT:0};sfx.climb();}
     return;
   }
   if(S.vine){
     const sv=S.vine,V=sv.v;sv.t+=dt;S.swimming=false;S.frozen=false;S.hidden=false;S.onTop=false;S.energy=Math.min(100,S.energy+3*dt);
     let ph;
     if(sv.phase==='hook'){ // she flicks out a long claw and snags the vine, which swings over to her
-      const k=Math.min(1,sv.t/0.3),e=k*k*(3-2*k);ph=lerp(sv.from,sv.ph0,e);
+      const k=Math.min(1,sv.t/(sv.hookD||0.3)),e=k*k*(3-2*k);ph=lerp(sv.from,sv.ph0,e);
       const r=V.L-VHAND,tx=V.pv.x+Math.sin(ph)*r*V.ux,ty=V.pv.y-Math.cos(ph)*r,tz=V.pv.z+Math.sin(ph)*r*V.uz;
       S.pos.set(lerp(sv.start.x,tx,e),lerp(sv.start.y,ty,e),lerp(sv.start.z,tz,e));
       if(k>=1){sv.phase='swing';sv.t=0;sfx.swoosh();buzz(25);}}
@@ -1295,7 +1297,7 @@ function updateSloth(dt){
       const r=V.L-VHAND;S.pos.set(V.pv.x+Math.sin(ph)*r*V.ux,V.pv.y-Math.cos(ph)*r,V.pv.z+Math.sin(ph)*r*V.uz);
       if(L2&&B.state==='trapped'&&V===SPECIAL.pandaVine&&Math.abs(ph)<0.2)rescueBao();
       if(k>=1){const toB=sv.face>0;const T=toB?V.B:V.A,tt=clamp((toB?V.tB:V.tA)-VHAND,0.5,T.maxT||T.len-0.7);
-        V.held=false;V.ph=ph;V.w=0;S.vine=null;S.vineCool=0.6;S.climb={palm:T,t:tt,ox:-V.ux*sv.face,oz:-V.uz*sv.face,downT:0};sfx.climb();
+        V.held=false;V.ph=ph;V.w=0;S.vine=null;S.vineCool=0.35;S.climb={palm:T,t:tt,ox:-V.ux*sv.face,oz:-V.uz*sv.face,downT:0};sfx.climb();
         hint('vineChain','Nice swing! Some trees have another vine. Push toward the next tree to keep swinging!',false);return;}}
     V.ph=ph;sv.tilt=-sv.face*ph;S.heading=Math.atan2(V.ux*sv.face,V.uz*sv.face);S.moving=1;S.ph+=dt*3;
     return;
@@ -1315,12 +1317,11 @@ function updateSloth(dt){
       else if(mag<=0.35&&(GO.held||S.goTap))aim=fwdVine(P);
       if(aim)aimT=(aim.end?aim.v.tB:aim.v.tA)-(aim.v.kind==='rope'?0:VHAND);}
     GO.aim=aim||(mag<=0.35?fwdVine(P):null);
-    if(aim){ // climb straight to the vine's height, then grab it
-      const d=aimT-c.t;c.t+=clamp(d,-3*dt,3*dt);S.moving=1;S.ph+=dt*5*Math.sign(d||1);
-      if(Math.abs(d)<0.15){const e=aim,V=e.v,sg=e.end?-1:1;S.climb=null;sfx.climb();
+    if(aim){ // no climbing up or down first: she leaps straight from where she is onto the vine
+      {const e=aim,V=e.v,sg=e.end?-1:1;S.climb=null;sfx.climb();
         S.goTap=false;GO.aim=null;
-        if(V.kind==='rope'){S.vine={kind:'rope',v:V,s:e.end?1:0,tilt:0};S.vineFace=sg;hint('ropeGo','Hang on! She crosses all by herself. Pull back if you want to turn around.',false);}
-        else{V.held=true;V.pin=false;S.vine={kind:'swing',v:V,phase:'hook',t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);}
+        if(V.kind==='rope'){S.vine={kind:'rope',v:V,s:e.end?1:0,tilt:0,leap:{t:0,from:S.pos.clone()}};S.vineFace=sg;hint('ropeGo','Hang on! She crosses all by herself. Pull back if you want to turn around.',false);}
+        else{V.held=true;V.pin=false;S.vine={kind:'swing',v:V,phase:'hook',hookD:clamp(0.3+Math.abs(c.t-aimT)*0.05,0.3,0.5),t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);}
         return;}
     }else{
       // sideways with no hanging vine that way: circle around the trunk (the camera comes along)
