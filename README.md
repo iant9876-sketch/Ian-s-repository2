@@ -16,3 +16,4 @@ Open `index.html` in a browser. It needs no build step and no install.
 ## Also in this repository
 
 - [Theater of War](theater-of-war/): an AI war simulation where you command a war in plain words. See its own README.
+- [The Long Way to Toucan Falls](toucan-falls/): a 3D island adventure where a sloth sets out to visit her friend the toucan. See its own README.
