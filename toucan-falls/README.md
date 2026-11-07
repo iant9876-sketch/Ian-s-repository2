@@ -18,6 +18,13 @@ The original vines are back too. These are strung straight between two trees. Cl
 
 Some stretches of the trail are treetop trails, with trees zigzagging along both sides. Hanging vines run along each side of the trail, and swinging vines cross it, so you can travel a long way without touching the ground. When you finally climb down, the game tells you how far you went.
 
+## Controls on a tree
+
+- **Up:** climb up. If the tree has a swinging vine ahead, she climbs to it and swings.
+- **Left or right:** grab a hanging vine on that side. If there isn't one, she circles around the trunk.
+- **Down:** climb down and hop off.
+- Turning the camera also makes her scoot around the trunk to the side you're looking at.
+
 ## Play
 
 Open `index.html` in a browser. It works on phones and tablets as well as computers. It needs no install, but it loads three.js from a CDN, so it needs an internet connection.
