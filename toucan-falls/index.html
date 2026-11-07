@@ -1088,7 +1088,12 @@ const sfx={
   feather(){tone(1046,0.12,'sine',0.18);tone(1568,0.25,'sine',0.15,null,0.07);tone(2093,0.3,'sine',0.1,null,0.14);},
   splash(){noiseHit(900,0.35,0.35);},
   growl(){tone(95,0.7,'sawtooth',0.14,55);noiseHit(160,0.6,0.25);},
-  swoosh(){noiseHit(650,1.1,0.3);tone(330,0.7,'sine',0.07,660);},
+  // "ssshhhwwww": airy noise that sweeps from a hiss down to a soft whoosh, swelling at the bottom of the swing
+  swoosh(d){if(!AU.ctx)return;d=d||1.5;const t=AU.ctx.currentTime,c=AU.ctx;const s=c.createBufferSource();s.buffer=getNoise();s.loop=true;
+    const f=c.createBiquadFilter();f.type='bandpass';f.Q.value=0.9;f.frequency.setValueAtTime(4800,t);f.frequency.exponentialRampToValueAtTime(2000,t+d*0.35);f.frequency.exponentialRampToValueAtTime(420,t+d);
+    const f2=c.createBiquadFilter();f2.type='lowpass';f2.frequency.value=6000;
+    const g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.1,t+d*0.15);g.gain.exponentialRampToValueAtTime(0.32,t+d*0.5);g.gain.exponentialRampToValueAtTime(0.0001,t+d*1.05);
+    s.connect(f);f.connect(f2);f2.connect(g);g.connect(AU.master);s.start(t);s.stop(t+d*1.1);},
   // claws digging into bark: a soft woody knock and a few quick scratches
   claw(){const v=0.7+Math.random()*0.3;tone(150+Math.random()*30,0.07,'triangle',0.05*v,95);for(let i=0;i<3;i++)noiseAt(2600+Math.random()*1400,0.035+Math.random()*0.02,0.11*v,0.01+i*0.032+Math.random()*0.01,2.2);},
   // claws snagging a vine: a leafy rustle, a couple of light scratches and a little stretchy creak
@@ -1300,7 +1305,7 @@ function updateSloth(dt){
       const k=Math.min(1,sv.t/(sv.hookD||0.3)),e=k*k*(3-2*k);ph=lerp(sv.from,sv.ph0,e);
       const r=V.L-VHAND,tx=V.pv.x+Math.sin(ph)*r*V.ux,ty=V.pv.y-Math.cos(ph)*r,tz=V.pv.z+Math.sin(ph)*r*V.uz;
       S.pos.set(lerp(sv.start.x,tx,e),lerp(sv.start.y,ty,e),lerp(sv.start.z,tz,e));
-      if(k>=1){sv.phase='swing';sv.t=0;sfx.swoosh();buzz(25);}}
+      if(k>=1){sv.phase='swing';sv.t=0;sfx.swoosh(sv.D);buzz(25);}}
     else{ // a big pendulum swing: slow at the ends, fastest at the bottom
       const k=Math.min(1,sv.t/sv.D);ph=sv.ph0+(sv.ph1-sv.ph0)*(1-Math.cos(Math.PI*k))/2;
       const r=V.L-VHAND;S.pos.set(V.pv.x+Math.sin(ph)*r*V.ux,V.pv.y-Math.cos(ph)*r,V.pv.z+Math.sin(ph)*r*V.uz);
