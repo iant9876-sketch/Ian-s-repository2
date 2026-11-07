@@ -20,11 +20,14 @@ Some stretches of the trail are treetop trails, with trees zigzagging along both
 
 ## Controls on a tree
 
-- **GO button:** a glowing arrow marks the vine that leads furthest along the trail. Tap GO to take it. Hold GO and she keeps going from vine to vine on her own.
-- **Stick:** push roughly toward any vine and she climbs to it and takes it. Pushing sideways with no vine that way circles her around the trunk.
+- **Stick:** push roughly toward any vine (a glowing arrow shows which one) and she leaps straight onto it. Pushing sideways with no vine that way circles her around the trunk.
 - **Down:** climb down and hop off.
 - Hanging vines are crossed automatically. Pull back to turn around.
 - Turning the camera also makes her scoot around the trunk to the side you're looking at.
+
+## Trot
+
+The 🐾 TROT button gives a short burst of speed, about a second and a half, for getting away from a jaguar. It then needs about six seconds to recharge. On a keyboard, press R or Q.
 
 ## Play
 
