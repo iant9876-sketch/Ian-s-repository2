@@ -942,7 +942,7 @@ function buildSloth(L){
      strand(Mf,STRAND,sd*w*(0.9-row*0.04),y,z+(rnd()-0.5)*0.03,new V3(sd*(0.25+row*0.25+rnd()*0.2),-1,(rnd()-0.5)*0.5),ln,0.05+rnd()*0.035,tc.clone());}
    for(let k=0;k<9;k++){const a=(k/8-0.5)*2.4;const x=Math.sin(a)*0.36,z=-0.68-Math.cos(a)*0.05;tc.setScalar(0.75+rnd()*0.3);strand(Mf,STRAND,x,0.5+rnd()*0.08,z,new V3(x*0.6,-1,-0.4),0.2+rnd()*0.08,0.065,tc.clone());}
    for(let k=0;k<7;k++){const x=(k/6-0.5)*0.5;tc.setScalar(0.85+rnd()*0.25);strand(Mf,STRAND,x,0.42,0.42+Math.abs(x)*-0.2,new V3(x*0.5,-1,0.25),0.14+rnd()*0.06,0.06,tc.clone());}
-   const fm=Mf.build(furFr,true);if(fm)root.add(fm);}
+   const fm=Mf.build(furFr,false);if(fm)root.add(fm);}
   const head=new THREE.Group();head.position.set(0,1.0,0.68);head.scale.setScalar(0.92);root.add(head);
   blob(fur,0,0,0,0.42,0.39,0.4,head);
   blob(cream,0,-0.03,0.2,0.35,0.29,0.24,head);
@@ -960,7 +960,7 @@ function buildSloth(L){
     // long drooping strands that hang off the back and sides
     for(let k=0;k<95;k++){const x=(rnd()-0.5)*0.9,z=-0.6+rnd()*1.0;const w=bodyHalfW(z,0.75);if(Math.abs(x)>w*0.92)continue;const y=onBack(x,z);const side=Math.abs(x)/Math.max(0.2,w);
       const dir=new V3(Math.sign(x||0.01)*(0.5+side*1.2),-0.25-side*1.1,-0.45+(rnd()-0.5)*0.3);strand(Mm,STRAND,x,y-0.03,z,dir,0.18+side*0.24+rnd()*0.08,0.042+rnd()*0.018,cc());}
-    const mm=Mm.build(new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95}),true);if(mm)mg.add(mm);}
+    const mm=Mm.build(new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95}),false);if(mm)mg.add(mm);}
   else if(L.moss==='patches'){[[0.2,-0.1],[-0.24,0.12],[0.04,0.28],[-0.1,-0.34],[0.28,-0.42],[-0.3,-0.2]].forEach((p,i)=>{blob(i%2?moss:moss2,p[0],onBack(p[0],p[1])-0.01,p[1],0.17,0.07,0.17,mg);for(let k=0;k<3;k++)blob(i%2?moss2:moss,p[0]+(rnd()-0.5)*0.15,onBack(p[0],p[1])+0.03,p[1]+(rnd()-0.5)*0.15,0.05,0.05,0.05,mg);});}
   else if(L.moss==='stripes'){[-0.2,0,0.2].forEach((x,i)=>{for(let k=0;k<5;k++){const z=-0.5+k*0.22;blob(i===1?moss2:moss,x,onBack(x,z)-0.01,z,0.08,0.06,0.13,mg);}});}
   else{for(let i=0;i<30;i++){const x=(rnd()-0.5)*0.8,z=(rnd()-0.5)*1.1;if(Math.abs(x)>bodyHalfW(z,0.8)*0.85)continue;blob(i%2?moss:moss2,x,onBack(x,z),z,0.09+rnd()*0.05,0.08,0.09+rnd()*0.05,mg);}}
@@ -1227,8 +1227,8 @@ function palmPoint(P,t){return P.curve.getPointAt(clamp(t/P.len,0,1),_cp);}
 function nearPalm(){if(S.swimming)return null;let best=null,bd=2.1;for(const p of palms){const d=Math.hypot(p.x-S.pos.x,p.z-S.pos.z);if(d<bd&&Math.abs(S.pos.y-p.y)<1.5){bd=d;best=p;}}return best;}
 function actPress(){if(state!=='play')return;if(S.climb){dropDown();return;}const p=nearPalm();if(p)startClimb(p);}
 function camMoveDir(mx,my){const fx=Math.sin(cam.yaw),fz=Math.cos(cam.yaw);let dx=fx*my-fz*mx,dz=fz*my+fx*mx;const l=Math.hypot(dx,dz);return l>0.001?[dx/l,dz/l]:[0,0];}
-function startClimb(p,t){if(p.vines){if(p.vines.some(e=>e.v.kind==='rope'))hint('vine','See the vine? Climb up to where it\'s tied, then push toward it to hang upside down and cross!',false);if(p.vines.some(e=>e.v.kind==='swing'))hint('swingVine','See the vine hanging from the branch? Climb up near the top, then push toward the other tree to SWING across!',false);}
-  if(S.skyU==null)S.skyU=S.u;const ox=S.pos.x-p.x,oz=S.pos.z-p.z,l=Math.hypot(ox,oz)||1;S.climb={palm:p,t:t||0.6,ox:ox/l,oz:oz/l,downT:0};S.frozen=false;S.vel.set(0,0,0);sfx.climb();hintsSeen.climbTip=1;hint('climbDown','Push up to climb higher. Push down to climb down and hop off!',false);}
+function startClimb(p,t){if(p.vines){if(p.vines.some(e=>e.v.kind==='rope'))hint('vine','See the vine tied to this tree? Push LEFT or RIGHT to grab it and cross hand over hand!',false);if(p.vines.some(e=>e.v.kind==='swing'))hint('swingVine','See the vine hanging from the branch? Push UP to climb to it and SWING across!',false);}
+  if(S.skyU==null)S.skyU=S.u;const ox=S.pos.x-p.x,oz=S.pos.z-p.z,l=Math.hypot(ox,oz)||1;S.climb={palm:p,t:t||0.6,ox:ox/l,oz:oz/l,downT:0};S.frozen=false;S.vel.set(0,0,0);sfx.climb();hintsSeen.climbTip=1;hint('climbDown','Push up to climb higher, down to climb down. Push sideways or turn the camera to circle around the trunk!',false);}
 function dropDown(){skyDone();const c=S.climb,p=c.palm;S.climb=null;S.onTop=false;S.climbCool=1.1;S.bumpT=0;const pt=palmPoint(p,c.t);S.pos.x=pt.x+c.ox*1.3;S.pos.z=pt.z+c.oz*1.3;S.vy=0;S.heading=Math.atan2(c.ox,c.oz);}
 function skyDone(){if(S.skyU==null)return;const d=Math.abs(S.u-S.skyU);S.skyU=null;
   if(d>=25){S.skyBest=Math.max(S.skyBest||0,d);setTimeout(()=>toast('🌳 '+Math.round(d)+' m through the treetops without touching the ground!'+(d>=S.skyBest-0.5&&d>=60?' New best!':'')),400);}}
@@ -1252,7 +1252,8 @@ function updateSloth(dt){
   if(S.vineCool>0)S.vineCool-=dt;
   if(S.climb||S.vine){S.idx=nearestIdx(S.pos.x,S.pos.z,S.idx,40);S.u=PS[S.idx].u;}
   if(S.vine&&S.vine.kind==='rope'){ // hanging upside down, crossing hand over hand
-    const sv=S.vine,V=sv.v;const [dx,dz]=camMoveDir(mx,my);const along=(dx*V.ux+dz*V.uz)*mag;
+    const sv=S.vine,V=sv.v;const [dx,dz]=camMoveDir(mx,my);let along=(dx*V.ux+dz*V.uz)*mag;
+    if(Math.abs(along)<0.35*mag)along=S.vineFace*mag; // pushing sideways just keeps her going the way she faces
     if(Math.abs(along)>0.15)S.vineFace=along>0?1:-1;
     sv.s=clamp(sv.s+along*1.6*dt/V.len,0,1);S.moving=Math.abs(along)>0.15?1:0;S.ph+=dt*4.5*S.moving;
     const q=V.curve.getPoint(sv.s);S.pos.set(q.x,q.y,q.z);S.heading=Math.atan2(V.ux*S.vineFace,V.uz*S.vineFace);
@@ -1280,22 +1281,37 @@ function updateSloth(dt){
     return;
   }
   if(S.climb){
-    const c=S.climb,P=c.palm;
-    // near a vine's knot? pushing toward the vine grabs it (and doesn't climb)
-    let grab=false;if(P.vines&&S.vineCool<=0&&mag>0.45){const [dx,dz]=camMoveDir(mx,my);
-      for(const e of P.vines){const rope=e.v.kind==='rope';const at=(e.end?e.v.tB:e.v.tA)-(rope?0:VHAND);if(Math.abs(c.t-at)>(rope?1.1:1.4))continue;const sg=e.end?-1:1;
-        if(S.vineTip!==P&&toastT<=0){S.vineTip=P;toast(rope?'🌿 Push toward the vine to hang on it':'🌿 Push toward the other tree to swing!');}
-        if((dx*e.v.ux+dz*e.v.uz)*sg>0.5&&rope){grab=true;S.vineHold+=dt;if(S.vineHold>0.18){S.vineHold=0;S.climb=null;S.vine={kind:'rope',v:e.v,s:e.end?1:0,tilt:0};S.vineFace=sg;sfx.climb();hint('ropeGo','Hang on! Keep pushing to cross. Nothing can reach you up here.',false);return;}}
-        else if((dx*e.v.ux+dz*e.v.uz)*sg>0.5){grab=true;S.vineHold+=dt;if(S.vineHold>0.18){S.vineHold=0;S.climb=null;const V=e.v;V.held=true;V.pin=false;
-          S.vine={kind:'swing',v:V,phase:'hook',t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};sfx.climb();hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);return;}}}}
-    if(!grab)S.vineHold=0;
-    if(!grab)c.t=clamp(c.t+my*2.3*dt,0.5,P.maxT||P.len-0.7);
-    // holding down at the bottom of the trunk hops her off automatically
-    if(c.t<=0.52&&my<-0.3){c.downT+=dt;if(c.downT>0.15){dropDown();return;}}else c.downT=0;
-    S.onTop=c.t>(P.maxT||P.len-0.7)-1.1;S.moving=Math.abs(my)>0.1?1:0;S.swimming=false;S.frozen=false;S.hidden=false;
+    const c=S.climb,P=c.palm,top=P.maxT||P.len-0.7;
+    const fx=Math.sin(cam.yaw),fz=Math.cos(cam.yaw),rxw=-fz,rzw=fx; // camera forward and right, flat on the ground
+    // like a squirrel, she scoots around the trunk to the side the camera is looking at
+    {let a=Math.atan2(c.ox,c.oz);const b=Math.atan2(-fx,-fz);let d=b-a;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+     const st=3.4*dt;a+=clamp(d,-st,st);c.ox=Math.sin(a);c.oz=Math.cos(a);if(Math.abs(d)>0.05)S.ph+=dt*4;}
+    // auto-aim: up = swinging vine, left/right = hanging vine (or circle the trunk), down = climb down
+    let aim=null,aimT=0;
+    if(P.vines&&S.vineCool<=0&&mag>0.35){
+      if(my>Math.abs(mx)*0.8){let best=-0.3;for(const e of P.vines){if(e.v.kind!=='swing')continue;const sg=e.end?-1:1;const sc=(e.v.ux*fx+e.v.uz*fz)*sg;if(sc>best){best=sc;aim=e;}}
+        if(aim)aimT=(aim.end?aim.v.tB:aim.v.tA)-VHAND;}
+      else if(Math.abs(mx)>Math.abs(my)){let best=-0.3;for(const e of P.vines){if(e.v.kind!=='rope')continue;const sg=e.end?-1:1;const sc=(e.v.ux*rxw+e.v.uz*rzw)*sg*Math.sign(mx);if(sc>best){best=sc;aim=e;}}
+        if(aim)aimT=aim.end?aim.v.tB:aim.v.tA;}}
+    if(aim){ // climb straight to the vine's height, then grab it
+      const d=aimT-c.t;c.t+=clamp(d,-3*dt,3*dt);S.moving=1;S.ph+=dt*5*Math.sign(d||1);
+      if(Math.abs(d)<0.15){const e=aim,V=e.v,sg=e.end?-1:1;S.climb=null;sfx.climb();
+        if(V.kind==='rope'){S.vine={kind:'rope',v:V,s:e.end?1:0,tilt:0};S.vineFace=sg;hint('ropeGo','Hang on! Keep pushing to cross. Nothing can reach you up here.',false);}
+        else{V.held=true;V.pin=false;S.vine={kind:'swing',v:V,phase:'hook',t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);}
+        return;}
+    }else{
+      // sideways with no hanging vine that way: circle around the trunk (the camera comes along)
+      if(Math.abs(mx)>Math.abs(my)&&Math.abs(mx)>0.3){cam.yaw+=mx*1.9*dt;S.moving=1;}
+      else{c.t=clamp(c.t+my*2.3*dt,0.5,top);S.moving=Math.abs(my)>0.1?1:0;if(S.moving)S.ph+=dt*5*Math.sign(my);}
+      // holding down at the bottom of the trunk hops her off automatically
+      if(c.t<=0.52&&my<-0.3){c.downT+=dt;if(c.downT>0.15){dropDown();return;}}else c.downT=0;
+    }
+    if(P.vines&&S.vineTip!==P&&toastT<=0){S.vineTip=P;const sw=P.vines.some(e=>e.v.kind==='swing'),rp=P.vines.some(e=>e.v.kind==='rope');
+      toast((sw?'⬆ swing vine   ':'')+(rp?'⬅ ➡ hanging vine   ':'')+'⬇ climb down');}
+    S.onTop=c.t>top-1.1;S.swimming=false;S.frozen=false;S.hidden=false;
     if(S.onTop){S.energy=Math.min(100,S.energy+22*dt);if(S.cpPalm!==P){S.cpPalm=P;toast('🌴 Safe spot saved');}}
     const pt=palmPoint(P,c.t);S.pos.set(pt.x+c.ox*0.36,pt.y,pt.z+c.oz*0.36);S.heading=Math.atan2(-c.ox,-c.oz);
-    if(S.moving)S.ph+=dt*5*Math.sign(my);return;
+    return;
   }
   if(S.skyU!=null)skyDone();
   S.onTop=false;if(S.climbCool>0)S.climbCool-=dt;
@@ -1498,6 +1514,7 @@ function updateCamera(dt,snap){
   else{
     tx=S.pos.x;ty=S.pos.y+(S.vine?(S.vine.kind==='rope'?-0.2:0.9):1.3);tz=S.pos.z;
     const sp=Math.hypot(S.vel.x,S.vel.z);
+    if(S.vine&&time-cam.lastDrag>1.4)cam.yaw=lerpAngle(cam.yaw,S.heading,dt*(S.vine.kind==='swing'?1.6:1.1));
     if(!S.climb&&sp>0.6&&time-cam.lastDrag>1.4&&input.my>-0.3){cam.yaw=lerpAngle(cam.yaw,S.heading,dt*0.9*Math.min(1,sp/3));}
     yaw=cam.yaw;dist=S.vine?(S.vine.kind==='rope'?7.6:9.2):S.climb?7.6:(S.swimming?7.6:8);if(bossOn()){dist=9.5;pitch=Math.max(pitch,0.42);}if(S.climb||S.vine)pitch=clamp(pitch,0.02,0.32);
     {const fx0=Math.sin(yaw),fz0=Math.cos(yaw),hd=dist*Math.cos(pitch);for(const p of palms){if(S.climb&&p===S.climb.palm)continue;const ax=p.x-tx,az=p.z-tz;if(Math.abs(ax)>hd+1||Math.abs(az)>hd+1)continue;const t=-(ax*fx0+az*fz0);if(t<0.8||t>hd)continue;const px=ax+fx0*t,pz=az+fz0*t;if(px*px+pz*pz<0.8*0.8)dist=Math.min(dist,Math.max(2.6,(t-0.9)/Math.cos(pitch)));}}
