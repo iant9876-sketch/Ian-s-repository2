@@ -1251,7 +1251,8 @@ function skyDone(){if(S.skyU==null)return;const d=Math.abs(S.u-S.skyU);S.skyU=nu
 const GO={aim:null};
 // trot: a short burst of (sloth) speed for getting out of a bad spot, then a rest before the next one
 const TROT_T=1.5,TROT_CD=6,TROT_X=1.9;
-function trotPress(){if(state!=='play'||S.climb||S.vine||S.trotT>0||S.trotCd>0)return;S.trotT=TROT_T;S.trotCd=TROT_CD;S.frozen=false;sfx.pop();buzz(20);hint('trot','Trot! A quick burst of speed. It needs a rest before you can do it again.',false);}
+const TROT_COST=12,TROT_DRAIN=7; // energy: up front, then per second while trotting
+function trotPress(){if(state!=='play'||S.climb||S.vine||S.trotT>0||S.trotCd>0)return;if(S.energy<TROT_COST){toast('😮‍💨 Too tired to trot! Rest a moment.');return;}S.energy-=TROT_COST;S.trotT=TROT_T;S.trotCd=TROT_CD;S.frozen=false;sfx.pop();buzz(20);hint('trot','Trot! A quick burst of speed, but it tires you out. It needs a rest before you can do it again.',false);}
 const aimG=new THREE.Group();{const gl=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xc8ff7a,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,fog:false}));gl.scale.set(1.6,1.6,1);aimG.add(gl);
   const ar=new THREE.Mesh(new THREE.ConeGeometry(0.22,0.55,10),new THREE.MeshBasicMaterial({color:0xfff27a,depthTest:false,transparent:true,fog:false}));ar.renderOrder=9;gl.renderOrder=8;aimG.add(ar);aimG.userData.ar=ar;aimG.userData.gl=gl;}
 aimG.visible=false;scene.add(aimG);
@@ -1373,7 +1374,7 @@ function updateSloth(dt){
   const ty=swim2?-0.36+Math.sin(time*2.6)*0.05:Math.max(h2,-0.9);
   if(!swim2&&S.pos.y>ty+0.05){S.vy-=24*dt;S.pos.y+=S.vy*dt;if(S.pos.y<ty){S.pos.y=ty;S.vy=0;}}else{S.vy=0;S.pos.y+=(ty-S.pos.y)*Math.min(1,dt*10);}
   const sp=Math.hypot(S.vel.x,S.vel.z);S.moving=sp/base;
-  S.energy+=(sp<0.25?(S.frozen?6:4.5):-(S.swimming?1.7:(wade?1.2:0.75))*S.moving)*dt;S.energy=clamp(S.energy,0,100);
+  S.energy+=(sp<0.25?(S.frozen?6:4.5):-(S.swimming?1.7:(wade?1.2:0.75))*S.moving)*dt;if(S.trotT>0)S.energy-=TROT_DRAIN*dt;S.energy=clamp(S.energy,0,100);
   if(sp>0.3)S.heading=lerpAngle(S.heading,Math.atan2(S.vel.x,S.vel.z),dt*8);
   S.ph+=dt*sp*(S.swimming?1.3:2.3);
   S.inBush=false;for(const b of bushes){if(Math.abs(b.x-S.pos.x)>2||Math.abs(b.z-S.pos.z)>2)continue;if(Math.hypot(b.x-S.pos.x,b.z-S.pos.z)<b.r){S.inBush=true;break;}}
