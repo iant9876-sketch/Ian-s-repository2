@@ -20,9 +20,10 @@ Some stretches of the trail are treetop trails, with trees zigzagging along both
 
 ## Controls on a tree
 
-- **Up:** climb up. If the tree has a swinging vine ahead, she climbs to it and swings.
-- **Left or right:** grab a hanging vine on that side. If there isn't one, she circles around the trunk.
+- **GO button:** a glowing arrow marks the vine that leads furthest along the trail. Tap GO to take it. Hold GO and she keeps going from vine to vine on her own.
+- **Stick:** push roughly toward any vine and she climbs to it and takes it. Pushing sideways with no vine that way circles her around the trunk.
 - **Down:** climb down and hop off.
+- Hanging vines are crossed automatically. Pull back to turn around.
 - Turning the camera also makes her scoot around the trunk to the side you're looking at.
 
 ## Play
