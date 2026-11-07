@@ -575,9 +575,22 @@ const chunks=[];const CHUNK=80;
 const RESV=L2?[[606,644],[655,675],[735,755],[965,985],[1040,1165],[GOAL_U-14,LEN+5]]:[[GOAL_U-14,LEN+5]];
 const reserved=u=>RESV.some(r=>u>r[0]&&u<r[1]);
 const SPECIAL={};
+// --- treetop trails: stretches where trees zigzag along both sides of the trail, all linked by vines,
+// so she can travel a long way without touching the ground ---
+const ROUTES=L2?[[60,160],[280,400],[780,900]]:[[60,175],[395,525],[895,1015],[1200,1262]];
+const RNODES=[],RN_AT=new Map(),RN_POS=[];
+const nearRN=(x,z,d)=>RN_POS.some(o=>Math.hypot(o.x-x,o.z-z)<d);
+for(const R_ of ROUTES){const pat=[[0,-1],[8,-1],[12,1],[20,1]];let run=[];
+  const flush=()=>{if(run.length>1)RNODES.push(run);run=[];};
+  for(let u=R_[0];;){for(const [du,sd] of pat){const uu=u+du;if(uu>R_[1]){flush();break;}
+      const lat=sd*5.2,a=pathAt(uu,lat),h=getH(a.x,a.z);
+      if(h>0.9&&!reserved(uu)&&waterF(uu)<0.05){const N={u:uu,lat,side:sd,P:null};run.push(N);RN_POS.push({x:a.x,z:a.z});const i=idxOfU(uu);(RN_AT.get(i)||RN_AT.set(i,[]).get(i)).push(N);}else flush();}
+    u+=24;if(u>R_[1]){flush();break;}}}
 function mtxDir(x,y,z,dir,sx,sy,sz){_q.setFromUnitVectors(new V3(0,1,0),dir.clone().normalize());return new THREE.Matrix4().compose(new V3(x,y,z),_q,new V3(sx,sy===undefined?sx:sy,sz===undefined?sx:sz));}
 function specialTree(M_,u,lat,h){const a=pathAt(u,lat);const y=getH(a.x,a.z);const P={x:a.x,z:a.z,y,h:h||7.4,lx:0,lz:0,kind:'broad',u,special:true,noPush:true};addBroad(M_,P);P.maxT=P.len-2.3;palms.push(P);rocks.push({x:a.x,z:a.z,r:0.1});return P;}
 function specialAt(i,M_){
+  const rn=RN_AT.get(i);if(rn)for(const N of rn){N.P=specialTree(M_,N.u,N.lat,7.6);N.P.side=N.side;N.P.route=true;}
+  if(!L2)return;
   if(i===idxOfU(625)){SPECIAL.pandaA=specialTree(M_,625,-5.4,7.6);SPECIAL.pandaB=specialTree(M_,625,5.4,7.6);}
   if(i===idxOfU(1085))SPECIAL.ar1=specialTree(M_,1085,-6,7.8);
   if(i===idxOfU(1094))SPECIAL.ar2=specialTree(M_,1094,0.5,7.8);
@@ -592,6 +605,7 @@ for(let i0=0;i0<PS.length-1;i0+=CHUNK){
   ch.group.add(ribbon(i0,i1));
   for(let i=i0;i<i1;i++){
     const p=PS[i],op=openF(p.u),wf=waterF(p.u);const at=lat=>[p.x+p.px*lat,p.z+p.pz*lat];
+    if(!L2)specialAt(i,M_);
     if(L2){specialAt(i,M_);
       // giant ferns along the trail edges
       for(const side of [-1,1])if(rnd()<0.2){const [x,z]=at(side*(3.1+rnd()*4.4));const h=getH(x,z);if(h>0.8){const sc=0.44+rnd()*0.24,n=4,a0=rnd()*6.28;for(let k=0;k<n;k++)M_.fronds.add(frondGeo,mtx(x,h+0.05,z,0,a0+k/n*6.28,0.7+rnd()*0.4,sc,sc,sc),'#ffffff');}}
@@ -609,7 +623,7 @@ for(let i0=0;i0<PS.length-1;i0+=CHUNK){
     for(const side of [-1,1]){
       // climbable trees lining the trail (pines are solid obstacles)
       if(!reserved(p.u)&&rnd()<0.15*(1-op*0.9)){const [x,z]=at(side*(4.3+op*7+rnd()*2.6));const h=getH(x,z);
-        if(h>0.9&&farFrom(x,z,palms,3.6)&&farFrom(x,z,rocks,2.4)&&!nearStart(x,z)&&!nearNest(x,z)){const k=kindAt(p.u);
+        if(h>0.9&&farFrom(x,z,palms,3.6)&&!nearRN(x,z,3.6)&&farFrom(x,z,rocks,2.4)&&!nearStart(x,z)&&!nearNest(x,z)){const k=kindAt(p.u);
           if(k==='pine'){const pp=addPine(M_.solid,x,h,z,0.9+rnd()*0.3,3.0);if(pp)rocks.push({x:pp[0],z:pp[1],r:0.75});}
           else{const P={x,z,y:h,h:k==='palm'?6+rnd()*3:(L2?6.5+rnd()*3:5.5+rnd()*2.5),lx:side*p.px*0.4+(rnd()-0.5)*0.4,lz:side*p.pz*0.4+(rnd()-0.5)*0.4,kind:k,u:p.u,side};if(k==='palm'){addPalm(M_,P);P.maxT=P.len-0.7;}else{addBroad(M_,P);P.maxT=P.len-2.3;}palms.push(P);}}}
       // dense forest wall behind
@@ -624,7 +638,7 @@ for(let i0=0;i0<PS.length-1;i0+=CHUNK){
         for(let k=0;k<12;k++){const ang=rnd()*Math.PI*2,s=0.85+rnd()*0.55;M_.leaves.add(leafGeo,mtx(x+Math.cos(ang)*0.15,h+0.15+rnd()*0.25,z-Math.sin(ang)*0.15,0,ang,0.35+rnd()*0.55,s,s,s),'#ffffff');}
         for(let k=0;k<4;k++){const ang=rnd()*Math.PI*2,s=0.7+rnd()*0.3;M_.leaves.add(leafGeo,mtx(x,h+0.3,z,0,ang,1.0+rnd()*0.3,s,s,s),'#ffffff');}
         const fc=['#ff4f7a','#ff8a2e','#ffd23f','#ff5fd0'][Math.floor(rnd()*4)];for(let k=0;k<3;k++){const a=rnd()*6.28,r=0.6+rnd()*0.5;addFlower(M_,x+Math.cos(a)*r,h+0.75+rnd()*0.35,z+Math.sin(a)*r,fc,1.2);}}}
-      if(!reserved(p.u)&&rnd()<1/14){const side=rnd()<0.5?-1:1;const [x,z]=at(side*(5+rnd()*6));const h=getH(x,z);if(h>0.4&&farFrom(x,z,palms,2)){const s=0.5+rnd()*1.0;rocks.push({x,z,r:s*0.9});addRock(M_,x,h+s*0.25,z,s,h<0.4);}}
+      if(!reserved(p.u)&&rnd()<1/14){const side=rnd()<0.5?-1:1;const [x,z]=at(side*(5+rnd()*6));const h=getH(x,z);if(h>0.4&&farFrom(x,z,palms,2)&&!nearRN(x,z,2.2)){const s=0.5+rnd()*1.0;rocks.push({x,z,r:s*0.9});addRock(M_,x,h+s*0.25,z,s,h<0.4);}}
       if(rnd()<(L2?0.1:0.22)){const [x,z]=at((rnd()*2-1)*8);const h=getH(x,z);if(h>1.0&&Math.abs((x-p.x)*p.px+(z-p.z)*p.pz)>1.5){const sh_=0.3+rnd()*0.25;M_.solid.add(stemGeo,mtx(x,h+sh_/2,z,0,0,0,1,sh_,1),'#3b9a35');addFlower(M_,x,h+sh_,z,['#ff5fa2','#ffb02e','#ffe14d','#ff6b5a','#c77dff','#ffffff'][i%6],0.9);}}
       for(let k=0;k<4;k++){const lat=(rnd()*2-1)*11;if(Math.abs(lat)<1.8)continue;const [x,z]=at(lat);const h=getH(x,z);if(h>1.05)grassSpots.push([x,h,z,Math.abs(lat)>4?1.4:0.8]);}
     }
@@ -690,18 +704,44 @@ function makeVine(A,B,force){if(!A||!B)return null;
   for(let k=0;k<3;k++){const a=k*2.1;Mr.add(petSph,mtx(Math.cos(a)*0.12,-L-0.1,Math.sin(a)*0.12,0,-a,-0.9,0.17,0.03,0.08),'#5fae3e');}
   const g=new THREE.Group();g.position.copy(pv);g.rotation.order='YXZ';const yaw=Math.atan2(ux,uz);g.rotation.set(0,yaw,0);
   const rm=Mr.build(solidMat,false);if(rm)g.add(rm);scene.add(g);
-  const V={A,B,tA,tB,ux,uz,yaw,pv,L,phA,phB,ph:0,w:0,seed:rnd()*6.28,g,held:false,pin:false,mid:{x:pv.x,z:pv.z},midY:pv.y-L};vines.push(V);
+  const V={kind:'swing',A,B,tA,tB,ux,uz,yaw,pv,L,phA,phB,ph:0,w:0,seed:rnd()*6.28,g,held:false,pin:false,mid:{x:pv.x,z:pv.z},midY:pv.y-L};vines.push(V);
   (A.vines=A.vines||[]).push({v:V,end:0});(B.vines=B.vines||[]).push({v:V,end:1});return V;}
-// pair up trees: a tree on the other side of the path is the favourite partner, so lots of vines swing right across it
+// --- hanging vines strung between pairs of trees: hang upside down and cross hand over hand ---
+const ropes=[];
+const VMv=new Merger();
+function makeRope(A,B,hOff,force){if(!A||!B)return null;const bd=Math.hypot(A.x-B.x,A.z-B.z);
+  const hgt=Math.max(A.y,B.y)+hOff;
+  let tA=tAtHeight(A,hgt),tB=tAtHeight(B,hgt);tA=Math.min(tA,(A.maxT||A.len-0.7)-0.4);tB=Math.min(tB,(B.maxT||B.len-0.7)-0.4);if(!force&&(tA<2.2||tB<2.2))return null;
+  const pA=A.curve.getPointAt(tA/A.len,new V3()),pB=B.curve.getPointAt(tB/B.len,new V3());if(!force&&Math.abs(pA.y-pB.y)>1.2)return null;
+  const ux=(pB.x-pA.x)/bd,uz=(pB.z-pA.z)/bd;pA.x+=ux*0.3;pA.z+=uz*0.3;pB.x-=ux*0.3;pB.z-=uz*0.3;
+  const mid=pA.clone().add(pB).multiplyScalar(0.5);let sag=0.35+0.07*bd;const gm=getH(mid.x,mid.z);if(mid.y-sag<gm+2.4)sag=Math.max(0.15,mid.y-gm-2.4);
+  const curve=new THREE.QuadraticBezierCurve3(pA,new V3(mid.x,mid.y-2*sag,mid.z),pB);
+  VMv.add(new THREE.TubeGeometry(curve,26,0.075,6,false),new THREE.Matrix4(),VC);
+  const tw=[];for(let k=0;k<=26;k++){const q=curve.getPoint(k/26);tw.push(new V3(q.x+Math.sin(k*1.3)*0.09*-uz,q.y+Math.cos(k*1.3)*0.09,q.z+Math.sin(k*1.3)*0.09*ux));}
+  VMv.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tw),40,0.035,5,false),new THREE.Matrix4(),VC2);
+  for(let k=0;k<9;k++){const q=curve.getPoint(0.06+0.88*rnd());const sc=0.3+rnd()*0.15;VMl.add(leafGeo,mtx(q.x,q.y,q.z,0,rnd()*6.28,-0.6-rnd()*0.8,sc,sc,sc),'#ffffff');}
+  for(let k=0;k<3;k++){const q=curve.getPoint(0.2+0.6*rnd());const L=0.6+rnd()*1.0;VMv.add(new THREE.TubeGeometry(new THREE.LineCurve3(q.clone(),new V3(q.x,q.y-L,q.z)),3,0.03,4,false),new THREE.Matrix4(),VC2);
+    VMl.add(leafGeo,mtx(q.x,q.y-L,q.z,0,rnd()*6.28,-1.2,0.32,0.32,0.32),'#ffffff');}
+  const V={kind:'rope',curve,len:curve.getLength(),A,B,tA,tB,ux,uz,mid:{x:mid.x,z:mid.z},midY:mid.y-sag};ropes.push(V);
+  (A.vines=A.vines||[]).push({v:V,end:0});(B.vines=B.vines||[]).push({v:V,end:1});return V;}
+// the old random vines between neighbouring trees, as before
 {const sorted=palms.filter(p=>!p.special).sort((a,b)=>a.u-b.u);const used=new Set();
-  for(let i=0;i<sorted.length;i++){const A=sorted[i];if(used.has(A)||rnd()>(L2?0.55:0.36))continue;let B=null,bs=1e9;
+  for(let i=0;i<sorted.length;i++){const A=sorted[i];if(used.has(A)||rnd()>(L2?0.55:0.36))continue;let B=null,bd=1e9;
+    for(let j=i+1;j<Math.min(sorted.length,i+14);j++){const Q=sorted[j];if(used.has(Q))continue;const d=Math.hypot(A.x-Q.x,A.z-Q.z);if(d<4.5||d>9.5||Math.abs(A.y-Q.y)>1.4)continue;if(d<bd){bd=d;B=Q;}}
+    if(!B)continue;if(makeRope(A,B,3.3+rnd()*0.8)){used.add(A);used.add(B);}}}
+// treetop trails: hanging vines along each side of the trail, swinging vines across it
+for(const run of RNODES)for(let k=0;k+1<run.length;k++){const a=run[k],b=run[k+1];if(!a.P||!b.P)continue;
+  if(a.side===b.side)makeRope(a.P,b.P,3.6,true);else makeVine(a.P,b.P,true);}
+// swinging vines between other trees: a tree on the other side of the path is the favourite partner
+{const sorted=palms.filter(p=>!p.special).sort((a,b)=>a.u-b.u);const used=new Set();
+  for(let i=0;i<sorted.length;i++){const A=sorted[i];if(used.has(A)||rnd()>(L2?0.38:0.26))continue;let B=null,bs=1e9;
     for(let j=i+1;j<Math.min(sorted.length,i+16);j++){const Q=sorted[j];if(used.has(Q))continue;const d=Math.hypot(A.x-Q.x,A.z-Q.z);if(d<4.5||d>13.5||Math.abs(A.y-Q.y)>1.4)continue;
       const cross=A.side&&Q.side&&A.side!==Q.side;const sc=d-(cross?7:0);if(sc<bs){bs=sc;B=Q;}}
     if(!B)continue;if(makeVine(A,B)){used.add(A);used.add(B);}}}
 if(L2){SPECIAL.pandaVine=makeVine(SPECIAL.pandaA,SPECIAL.pandaB,true);SPECIAL.arV1=makeVine(SPECIAL.ar1,SPECIAL.ar2,true);SPECIAL.arV2=makeVine(SPECIAL.ar2,SPECIAL.ar3,true);
   // Bao's vine starts hooked on the first tree, so the net below the bough is clear until she swings into it
   const V=SPECIAL.pandaVine;V.pin=true;V.ph=V.phA;}
-{const mb=VMb.build(barkMat);if(mb)scene.add(mb);const ms=VMs.build(solidMat);if(ms)scene.add(ms);const ml=VMl.build(leafMatB);if(ml){ml.customDepthMaterial=leafDepth;scene.add(ml);}}
+{const mv=VMv.build(solidMat);if(mv)scene.add(mv);const mb=VMb.build(barkMat);if(mb)scene.add(mb);const ms=VMs.build(solidMat);if(ms)scene.add(ms);const ml=VMl.build(leafMatB);if(ml){ml.customDepthMaterial=leafDepth;scene.add(ml);}}
 function updateVines(dt){const cx=camera.position.x,cz=camera.position.z,R2=Math.min(FOGU.far.value+20,120)**2;
   for(const V of vines){const on=(V.pv.x-cx)**2+(V.pv.z-cz)**2<R2;V.g.visible=on;
     if(V.held&&(!S.vine||S.vine.v!==V))V.held=false;
@@ -1073,7 +1113,7 @@ const JAGS=L2?[makeJag(300,450),makeJag(800,940)]:[makeJag(450,610),makeJag(950,
 function resetJaguar(J){let best=0,bd=-1;J.wps.forEach((w,i)=>{const d=Math.hypot(w[0]-S.pos.x,w[1]-S.pos.z);if(d>bd){bd=d;best=i;}});J.pos.set(J.wps[best][0],0,J.wps[best][1]);J.pos.y=getH(J.pos.x,J.pos.z);J.idx=nearestIdx(J.pos.x,J.pos.z,0,PS.length);J.wp=best;J.dir=best>0?-1:1;J.state='patrol';J.aware=0;J.jumpY=0;J.lvl=0;}
 function resetAllJags(){JAGS.forEach(resetJaguar);}
 function resetGame(){
-  S.pos.copy(START);S.vel.set(0,0,0);S.vy=0;S.heading=START_YAW;S.energy=100;S.swimming=S.wasSwim=false;S.frozen=false;S.hidden=false;S.climb=null;S.vine=null;S.cpU=0;S.cpPalm=null;S.bumpT=0;S.climbCool=0;S.mangoes=S.feathers=S.closeCalls=S.dodges=0;S.idx=idxOfU(0);S.u=0;S.lastCheck=0;
+  S.pos.copy(START);S.vel.set(0,0,0);S.vy=0;S.heading=START_YAW;S.energy=100;S.swimming=S.wasSwim=false;S.frozen=false;S.hidden=false;S.climb=null;S.vine=null;S.skyU=null;S.cpU=0;S.cpPalm=null;S.bumpT=0;S.climbCool=0;S.mangoes=S.feathers=S.closeCalls=S.dodges=0;S.idx=idxOfU(0);S.u=0;S.lastCheck=0;
   for(const p of pickups){p.taken=false;p.grp.visible=true;}
   resetAllJags();resetL2();resetCut();hintsSeen={};playTime=0;danger=0;cam.yaw=START_YAW;cam.pitch=0.36;
   T.pos.set(S.pos.x+2,S.pos.y+3,S.pos.z-3);T.vel.set(0,0,0);T.visitT=0;T.checkIn=40;
@@ -1187,8 +1227,11 @@ function palmPoint(P,t){return P.curve.getPointAt(clamp(t/P.len,0,1),_cp);}
 function nearPalm(){if(S.swimming)return null;let best=null,bd=2.1;for(const p of palms){const d=Math.hypot(p.x-S.pos.x,p.z-S.pos.z);if(d<bd&&Math.abs(S.pos.y-p.y)<1.5){bd=d;best=p;}}return best;}
 function actPress(){if(state!=='play')return;if(S.climb){dropDown();return;}const p=nearPalm();if(p)startClimb(p);}
 function camMoveDir(mx,my){const fx=Math.sin(cam.yaw),fz=Math.cos(cam.yaw);let dx=fx*my-fz*mx,dz=fz*my+fx*mx;const l=Math.hypot(dx,dz);return l>0.001?[dx/l,dz/l]:[0,0];}
-function startClimb(p,t){if(p.vines)hint('vine','See the vine? Climb up near the top, then push toward the other tree to grab the vine and SWING across!',false);const ox=S.pos.x-p.x,oz=S.pos.z-p.z,l=Math.hypot(ox,oz)||1;S.climb={palm:p,t:t||0.6,ox:ox/l,oz:oz/l,downT:0};S.frozen=false;S.vel.set(0,0,0);sfx.climb();hintsSeen.climbTip=1;hint('climbDown','Push up to climb higher. Push down to climb down and hop off!',false);}
-function dropDown(){const c=S.climb,p=c.palm;S.climb=null;S.onTop=false;S.climbCool=1.1;S.bumpT=0;const pt=palmPoint(p,c.t);S.pos.x=pt.x+c.ox*1.3;S.pos.z=pt.z+c.oz*1.3;S.vy=0;S.heading=Math.atan2(c.ox,c.oz);}
+function startClimb(p,t){if(p.vines){if(p.vines.some(e=>e.v.kind==='rope'))hint('vine','See the vine? Climb up to where it\'s tied, then push toward it to hang upside down and cross!',false);if(p.vines.some(e=>e.v.kind==='swing'))hint('swingVine','See the vine hanging from the branch? Climb up near the top, then push toward the other tree to SWING across!',false);}
+  if(S.skyU==null)S.skyU=S.u;const ox=S.pos.x-p.x,oz=S.pos.z-p.z,l=Math.hypot(ox,oz)||1;S.climb={palm:p,t:t||0.6,ox:ox/l,oz:oz/l,downT:0};S.frozen=false;S.vel.set(0,0,0);sfx.climb();hintsSeen.climbTip=1;hint('climbDown','Push up to climb higher. Push down to climb down and hop off!',false);}
+function dropDown(){skyDone();const c=S.climb,p=c.palm;S.climb=null;S.onTop=false;S.climbCool=1.1;S.bumpT=0;const pt=palmPoint(p,c.t);S.pos.x=pt.x+c.ox*1.3;S.pos.z=pt.z+c.oz*1.3;S.vy=0;S.heading=Math.atan2(c.ox,c.oz);}
+function skyDone(){if(S.skyU==null)return;const d=Math.abs(S.u-S.skyU);S.skyU=null;
+  if(d>=25){S.skyBest=Math.max(S.skyBest||0,d);setTimeout(()=>toast('🌳 '+Math.round(d)+' m through the treetops without touching the ground!'+(d>=S.skyBest-0.5&&d>=60?' New best!':'')),400);}}
 function hidePress(){if(state!=='play'||S.climb||S.vine||S.swimming){if(S.swimming)toast('Can\'t hide while swimming!');return;}S.frozen=!S.frozen;S.frozenT=0;if(S.frozen){S.vel.set(0,0,0);hint('freezeTip','Good! Stay still and your moss hides you. Move to un-freeze.',false);}}
 
 /* ---------------- Updates ---------------- */
@@ -1207,6 +1250,17 @@ function keepOnPath(x,z,maxLatExtra){
 function updateSloth(dt){
   readInput();const mx=input.mx,my=input.my,mag=Math.min(1,Math.hypot(mx,my));
   if(S.vineCool>0)S.vineCool-=dt;
+  if(S.climb||S.vine){S.idx=nearestIdx(S.pos.x,S.pos.z,S.idx,40);S.u=PS[S.idx].u;}
+  if(S.vine&&S.vine.kind==='rope'){ // hanging upside down, crossing hand over hand
+    const sv=S.vine,V=sv.v;const [dx,dz]=camMoveDir(mx,my);const along=(dx*V.ux+dz*V.uz)*mag;
+    if(Math.abs(along)>0.15)S.vineFace=along>0?1:-1;
+    sv.s=clamp(sv.s+along*1.6*dt/V.len,0,1);S.moving=Math.abs(along)>0.15?1:0;S.ph+=dt*4.5*S.moving;
+    const q=V.curve.getPoint(sv.s);S.pos.set(q.x,q.y,q.z);S.heading=Math.atan2(V.ux*S.vineFace,V.uz*S.vineFace);
+    S.energy=Math.min(100,S.energy+3*dt);S.swimming=false;S.frozen=false;S.hidden=false;S.onTop=false;
+    if((sv.s>=1&&along>0.1)||(sv.s<=0&&along<-0.1)){const toB=sv.s>=1;const T=toB?V.B:V.A,tt=toB?V.tB:V.tA;const sgn=toB?-1:1;
+      S.vine=null;S.vineCool=0.6;S.climb={palm:T,t:tt,ox:V.ux*sgn,oz:V.uz*sgn,downT:0};sfx.climb();}
+    return;
+  }
   if(S.vine){
     const sv=S.vine,V=sv.v;sv.t+=dt;S.swimming=false;S.frozen=false;S.hidden=false;S.onTop=false;S.energy=Math.min(100,S.energy+3*dt);
     let ph;
@@ -1229,10 +1283,11 @@ function updateSloth(dt){
     const c=S.climb,P=c.palm;
     // near a vine's knot? pushing toward the vine grabs it (and doesn't climb)
     let grab=false;if(P.vines&&S.vineCool<=0&&mag>0.45){const [dx,dz]=camMoveDir(mx,my);
-      for(const e of P.vines){const at=(e.end?e.v.tB:e.v.tA)-VHAND;if(Math.abs(c.t-at)>1.4)continue;const sg=e.end?-1:1;
-        if(S.vineTip!==P&&toastT<=0){S.vineTip=P;toast('🌿 Push toward the other tree to swing!');}
-        if((dx*e.v.ux+dz*e.v.uz)*sg>0.5){grab=true;S.vineHold+=dt;if(S.vineHold>0.18){S.vineHold=0;S.climb=null;const V=e.v;V.held=true;V.pin=false;
-          S.vine={v:V,phase:'hook',t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};sfx.climb();hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);return;}}}}
+      for(const e of P.vines){const rope=e.v.kind==='rope';const at=(e.end?e.v.tB:e.v.tA)-(rope?0:VHAND);if(Math.abs(c.t-at)>(rope?1.1:1.4))continue;const sg=e.end?-1:1;
+        if(S.vineTip!==P&&toastT<=0){S.vineTip=P;toast(rope?'🌿 Push toward the vine to hang on it':'🌿 Push toward the other tree to swing!');}
+        if((dx*e.v.ux+dz*e.v.uz)*sg>0.5&&rope){grab=true;S.vineHold+=dt;if(S.vineHold>0.18){S.vineHold=0;S.climb=null;S.vine={kind:'rope',v:e.v,s:e.end?1:0,tilt:0};S.vineFace=sg;sfx.climb();hint('ropeGo','Hang on! Keep pushing to cross. Nothing can reach you up here.',false);return;}}
+        else if((dx*e.v.ux+dz*e.v.uz)*sg>0.5){grab=true;S.vineHold+=dt;if(S.vineHold>0.18){S.vineHold=0;S.climb=null;const V=e.v;V.held=true;V.pin=false;
+          S.vine={kind:'swing',v:V,phase:'hook',t:0,from:V.ph,ph0:e.end?V.phB:V.phA,ph1:e.end?V.phA:V.phB,face:sg,start:S.pos.clone(),tilt:0,D:1.2+0.07*V.L};sfx.climb();hint('vineGo','Wheee! Hold on tight. Nothing can reach you while you swing.',false);return;}}}}
     if(!grab)S.vineHold=0;
     if(!grab)c.t=clamp(c.t+my*2.3*dt,0.5,P.maxT||P.len-0.7);
     // holding down at the bottom of the trunk hops her off automatically
@@ -1242,6 +1297,7 @@ function updateSloth(dt){
     const pt=palmPoint(P,c.t);S.pos.set(pt.x+c.ox*0.36,pt.y,pt.z+c.oz*0.36);S.heading=Math.atan2(-c.ox,-c.oz);
     if(S.moving)S.ph+=dt*5*Math.sign(my);return;
   }
+  if(S.skyU!=null)skyDone();
   S.onTop=false;if(S.climbCool>0)S.climbCool-=dt;
   if(S.frozen){S.frozenT+=dt;if(mag>0.35){S.frozen=false;}}
   const h=getH(S.pos.x,S.pos.z);S.swimming=h<-0.9;
@@ -1311,7 +1367,7 @@ function updateJaguar(J,dt){
 function caught(){if(state!=='play')return;state='caught';caughtT=1.8;S.closeCalls++;sfx.caught();buzz(250);$('caughtSub').textContent=look.slothName+' scrambled back to the last safe spot…';$('caught').classList.add('show');}
 function placeAtU(u){const a=pathAt(u);S.pos.set(a.x,getH(a.x,a.z),a.z);S.idx=idxOfU(u);S.u=u;S.heading=Math.atan2(a.p.tx,a.p.tz);cam.yaw=S.heading;}
 function respawn(){
-  $('caught').classList.remove('show');S.frozen=false;S.vel.set(0,0,0);S.climb=null;S.vine=null;
+  $('caught').classList.remove('show');S.frozen=false;S.vel.set(0,0,0);S.climb=null;S.vine=null;S.skyU=null;
   const P=S.cpPalm;
   if(P&&P.u>=S.cpU){const tt=(P.maxT||P.len-0.7)-0.4;S.climb={palm:P,t:tt,ox:1,oz:0,downT:0};const pt=palmPoint(P,tt);S.pos.copy(pt);S.idx=nearestIdx(P.x,P.z,S.idx,PS.length);S.u=P.u;}
   else placeAtU(S.cpU);
@@ -1329,6 +1385,7 @@ function checkProgress(){
   for(let k=S.lastCheck+1;k<CHECKS.length;k++){if(u>=CHECKS[k]&&!S.swimming){S.lastCheck=k;S.cpU=CHECKS[k];toast('🚩 Checkpoint!');}}
   if(u>JAGS[0].terr[0]-12&&!S.swimming)hint('jag','Careful! A jaguar hunts here. If your screen edges glow, it\'s onto you. FREEZE in your moss, climb a tree, or dodge sideways when it pounces!');
   if(u>JAGS[1].terr[0]-12&&!S.swimming)hint('jag2','Another jaguar lives up ahead. Remember: climb, freeze, or dodge!');
+  for(const R_ of ROUTES)if(u>R_[0]-14&&u<R_[0]+6)hint('canopy','A treetop trail! Climb up and see how far you can go without touching the ground!',false);
   if(u>GOAL_U*0.5)hint('half','You\'re halfway here, '+look.slothName+'! Keep going!',!L2);
   if(!L2){
     if(u>RIVER1[0]-25&&u<RIVER1[0])hint('river1','A river! Hop in and swim across to the other side!');
@@ -1395,6 +1452,8 @@ function animateSloth(dt){
     if(sp==='stir'){aR=-0.55+Math.sin(time*9)*0.3;azR=-0.35+Math.cos(time*9)*0.3;}
     if(sp==='sip'){aL=aR=-0.85;hx=1.3;}
     if(sp==='wave'){rx=0;ry=0;hx=0;aL=-0.25;aR=-2.6;azR=-0.5+Math.sin(time*9)*0.35;lL=lR=0;az=0.12;}}
+  else if(S.vine&&S.vine.kind==='rope'){ // hanging upside down under the vine, all four paws gripping, swinging hand over hand
+    rz=Math.PI;ry=-0.12;hz=Math.PI*0.85;hx=0.25;aL=0.15+Math.sin(ph)*0.55;aR=0.15-Math.sin(ph)*0.55;az=0.1;lL=-0.25-Math.sin(ph)*0.45;lR=-0.25+Math.sin(ph)*0.45;lz=0.08;}
   else if(S.vine){ // hanging from the vine by both front paws, body swinging below, back legs kicking out with the swing
     const sv=S.vine,sw=sv.phase==='swing'?Math.sin(Math.PI*Math.min(1,sv.t/sv.D)):0;
     rx=-1.4;hx=1.15-sw*0.3;aL=-1.78;aR=-1.78;az=0.14;lL=0.3+sw*0.95;lR=0.3+sw*0.95;lz=0.14;}
@@ -1405,7 +1464,7 @@ function animateSloth(dt){
   else if(state==='menu'){const w=time%6;hx=Math.sin(time*0.8)*0.06;if(w<1.6){aR=-2.6;azR=-0.5+Math.sin(time*9)*0.35;}}
   else{const s=Math.min(1,S.moving*1.5);aL=-0.25+Math.sin(ph)*0.7*s;aR=-0.25-Math.sin(ph)*0.7*s;lL=-Math.sin(ph)*0.5*s;lR=Math.sin(ph)*0.5*s;ry=Math.abs(Math.sin(ph))*0.06*s;hx=Math.sin(time*0.8)*0.05;}
   const k=Math.min(1,dt*10);
-  m.root.rotation.x=lerp(m.root.rotation.x,rx,k);m.root.rotation.z=lerp(m.root.rotation.z,rz,Math.min(1,dt*7));m.head.rotation.z=lerp(m.head.rotation.z,hz,Math.min(1,dt*6));m.root.position.y=lerp(m.root.position.y,ry,k);m.root.position.z=lerp(m.root.position.z,S.climb?0.32:(S.vine?0.75:0),k);
+  m.root.rotation.x=lerp(m.root.rotation.x,rx,k);m.root.rotation.z=lerp(m.root.rotation.z,rz,Math.min(1,dt*7));m.head.rotation.z=lerp(m.head.rotation.z,hz,Math.min(1,dt*6));m.root.position.y=lerp(m.root.position.y,ry,k);m.root.position.z=lerp(m.root.position.z,S.climb?0.32:(S.vine&&S.vine.kind==='swing'?0.75:0),k);
   m.head.rotation.x=lerp(m.head.rotation.x,hx,k);
   m.armL.rotation.x=lerp(m.armL.rotation.x,aL,k);m.armR.rotation.x=lerp(m.armR.rotation.x,aR,k);m.armL.rotation.z=lerp(m.armL.rotation.z,az,k);m.armR.rotation.z=lerp(m.armR.rotation.z,azR!==null?azR:-az,k);
   m.legL.rotation.x=lerp(m.legL.rotation.x,lL,k);m.legR.rotation.x=lerp(m.legR.rotation.x,lR,k);m.legL.rotation.z=lerp(m.legL.rotation.z,lz,k);m.legR.rotation.z=lerp(m.legR.rotation.z,-lz,k);
@@ -1437,10 +1496,10 @@ function updateCamera(dt,snap){
     if(!portrait){tx+=rx*0.2;}}
   else if(state==='win'){const a=time*0.25;yaw=a;pitch=L2?0.1:0.32;dist=L2?18:8;tx=L2?HOUSE.x:NEST.x;ty=NEST.y+(L2?6:1);tz=L2?HOUSE.z:NEST.z;}
   else{
-    tx=S.pos.x;ty=S.pos.y+(S.vine?0.9:1.3);tz=S.pos.z;
+    tx=S.pos.x;ty=S.pos.y+(S.vine?(S.vine.kind==='rope'?-0.2:0.9):1.3);tz=S.pos.z;
     const sp=Math.hypot(S.vel.x,S.vel.z);
     if(!S.climb&&sp>0.6&&time-cam.lastDrag>1.4&&input.my>-0.3){cam.yaw=lerpAngle(cam.yaw,S.heading,dt*0.9*Math.min(1,sp/3));}
-    yaw=cam.yaw;dist=S.vine?9.2:S.climb?7.6:(S.swimming?7.6:8);if(bossOn()){dist=9.5;pitch=Math.max(pitch,0.42);}if(S.climb||S.vine)pitch=clamp(pitch,0.02,0.32);
+    yaw=cam.yaw;dist=S.vine?(S.vine.kind==='rope'?7.6:9.2):S.climb?7.6:(S.swimming?7.6:8);if(bossOn()){dist=9.5;pitch=Math.max(pitch,0.42);}if(S.climb||S.vine)pitch=clamp(pitch,0.02,0.32);
     {const fx0=Math.sin(yaw),fz0=Math.cos(yaw),hd=dist*Math.cos(pitch);for(const p of palms){if(S.climb&&p===S.climb.palm)continue;const ax=p.x-tx,az=p.z-tz;if(Math.abs(ax)>hd+1||Math.abs(az)>hd+1)continue;const t=-(ax*fx0+az*fz0);if(t<0.8||t>hd)continue;const px=ax+fx0*t,pz=az+fz0*t;if(px*px+pz*pz<0.8*0.8)dist=Math.min(dist,Math.max(2.6,(t-0.9)/Math.cos(pitch)));}}
   }
   const fx=Math.sin(yaw),fz=Math.cos(yaw),cp=Math.cos(pitch),spch=Math.sin(pitch);
@@ -1473,7 +1532,7 @@ function update(dt){
   else if(state==='caught'){caughtT-=dt;if(caughtT<=0)respawn();}
   else if(state==='win'){winT+=dt;}
   else if(state==='menu'){S.ph+=dt*0.5;S.pos.copy(MENU_POS);S.idx=idxOfU(5);S.climb=null;S.swimming=false;S.frozen=false;S.hidden=false;}
-  updateVines(dt);updateToucan(dt);animateSloth(dt);updatePanda(dt);animateEagle(dt);updateL2Props(dt);updateConfetti(dt);updateHearts(dt);for(const J of JAGS)animateJaguar(J,dt);updateCamera(dt);CUT.c.value.copy(camera.position);if(state==='win')CUT.t.value.set(NEST.x,NEST.y+0.8,NEST.z);else CUT.t.value.set(S.pos.x,S.pos.y+0.8,S.pos.z);updateWarn(dt);updateFog(dt,S.u);updateChunks();updateShadowCenter(false,S.pos.x,S.pos.z);
+  updateVines(dt);updateToucan(dt);animateSloth(dt);updatePanda(dt);animateEagle(dt);updateL2Props(dt);updateConfetti(dt);updateHearts(dt);for(const J of JAGS)animateJaguar(J,dt);updateCamera(dt);CUT.c.value.copy(camera.position);if(state==='win')CUT.t.value.set(NEST.x,NEST.y+0.8,NEST.z);else CUT.t.value.set(S.pos.x,S.pos.y+(S.vine&&S.vine.kind==='rope'?-0.5:0.8),S.pos.z);updateWarn(dt);updateFog(dt,S.u);updateChunks();updateShadowCenter(false,S.pos.x,S.pos.z);
   sky.position.copy(camera.position);clouds.rotation.y+=dt*0.002;
   const bd=Math.hypot(S.pos.x-NEST.x,S.pos.z-NEST.z);beacon.material.opacity=(state==='menu'||state==='cut'||state==='done')?0:(0.18+0.1*Math.sin(time*2.5))*clamp((bd-6)/20,0,1);
   if(bubbleT>0){bubbleT-=dt;if(bubbleT<=0)$('bubble').classList.remove('show');}
@@ -1626,7 +1685,7 @@ function cutNext(){cutGo(CUTP.i+1);}
 function updateCut(dt){CUTP.t+=dt;const st=CUTP.steps[CUTP.i];if(!st)return;const i0=CUTP.i;if(st.tick)st.tick(CUTP.t,dt);if(CUTP.i===i0&&st.dur!==undefined&&CUTP.t>=st.dur)cutNext();}
 $('cutTap').addEventListener('pointerdown',e=>{e.preventDefault();const st=CUTP.steps[CUTP.i];if(st&&(st.tap||st.tapSkip)&&CUTP.t>0.35){sfx.pop();cutNext();}});
 $('cutSkip').addEventListener('click',()=>{if(state!=='cut')return;show('stir',false);stir.on=false;stirCb=null;show('card',false);cardCb=null;unlockCrown();friendAdd('zuzu');cutGo(CUTP.steps.length-2);});
-function startCutscene(){state='cut';show('hud',false);$('bubble').classList.remove('show');danger=0;S.climb=null;S.vine=null;S.frozen=false;S.hidden=false;S.vel.set(0,0,0);
+function startCutscene(){state='cut';show('hud',false);$('bubble').classList.remove('show');danger=0;S.climb=null;S.vine=null;S.skyU=null;S.frozen=false;S.hidden=false;S.vel.set(0,0,0);
   show('cutUI',true);cutHide();CUTP.steps=buildCutSteps();cutGo(0);}
 const sm3=k=>k*k*(3-2*k);
 function buildCutSteps(){const N=look.slothName,Z=look.toucanName;const door=RP(-4.9,0,0),seatS=RP(1.0,0,-1.75),seatZ=RP(1.0,1.27,1.65);let from=null;

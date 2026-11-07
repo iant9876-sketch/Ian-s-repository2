@@ -12,6 +12,12 @@ Some trees are joined by a mossy branch with a long vine hanging from it. Many o
 
 Nothing can catch you while you swing.
 
+## Hanging vines and treetop trails
+
+The original vines are back too. These are strung straight between two trees. Climb to where the vine is tied, push toward it, and the sloth hangs upside down and crosses hand over hand.
+
+Some stretches of the trail are treetop trails, with trees zigzagging along both sides. Hanging vines run along each side of the trail, and swinging vines cross it, so you can travel a long way without touching the ground. When you finally climb down, the game tells you how far you went.
+
 ## Play
 
 Open `index.html` in a browser. It works on phones and tablets as well as computers. It needs no install, but it loads three.js from a CDN, so it needs an internet connection.
