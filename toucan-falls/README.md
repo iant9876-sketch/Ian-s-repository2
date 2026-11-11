@@ -29,6 +29,19 @@ Some stretches of the trail are treetop trails, with trees zigzagging along both
 
 The 🐾 TROT button gives a short burst of speed, about a second and a half, for getting away from a jaguar. It uses a good chunk of energy (about a fifth of the bar), then needs about six seconds to recharge. If the bar is nearly empty, she is too tired to trot. On a keyboard, press R or Q.
 
+## Level 3: the Waterfall Cliffs
+
+Zuzu throws a Snack Fest at her house with Bao. Catch the falling fruit in your basket to make the fruit salad, but watch out for bees. Then Auntie Kiki flies in: a gust of wind blew Zuzu's baby brother Pip out to the old sea stack.
+
+- **Cliffs:** walk into the vines hanging down a cliff and push up to climb. At the top she pulls herself over the edge.
+- **Rope bridges:** two of them cross deep gorges. The deck is narrow, so she can't fall off.
+- **Shelly the sea turtle** joins you at the beach. While swimming, get close to her and tap 🐢 REST to sit on her shell and get your energy back. Nothing can get you up there.
+- **The giant manta ray** stalks the lagoon. When the screen edges glow and a red line appears, it's about to charge along it, so swim sideways. Sandbars are safe too.
+- **Boss fight:** among the rock pillars, hide behind a pillar when the ray aims at you so it crashes into the rock, then swim over and tap 🐾 BOP. Five BOPs wins. Later it also jumps (get out of the red circle) and sweeps a wide line (hide right next to Shelly).
+- Climb the vines up the sea stack to rescue Pip.
+
+Anyone who already finished Level 2 gets Level 3 unlocked automatically.
+
 ## Play
 
 Open `index.html` in a browser. It works on phones and tablets as well as computers. It needs no install, but it loads three.js from a CDN, so it needs an internet connection.
